@@ -22,8 +22,10 @@ export function readBoundFactoryProgress(options) {
       delivery=deliveryExplanation(result.state);
       firstUse=verifiedFirstUse(p,state,result);
     }
-    return {available:true,slug:p.slug,phase:state?.phase || 'not-started',running:Boolean(state?.running),workflowBudget:readFactoryBudget(options),
-      documentsApproved:Boolean(state?.contractApproval && state?.outcomeApproval),milestone:factoryMilestone(state,delivery,firstUse),
+    // A saved running marker without a turn that could own it is not running.
+    const turnActive=typeof options.turnActive==='boolean'?options.turnActive:undefined;
+    return {available:true,slug:p.slug,phase:state?.phase || 'not-started',running:Boolean(state?.running) && turnActive!==false,workflowBudget:readFactoryBudget(options),
+      documentsApproved:Boolean(state?.contractApproval && state?.outcomeApproval),milestone:factoryMilestone(state,delivery,firstUse,{turnActive}),
       builder:{provider:options.connectorId,modelId:state?.buildConfiguration?.modelId || options.model,effort:state?.buildConfiguration?.effort || options.effort || 'none'},delivery,firstUse};
   }catch{return {available:false,errorCode:'factory_evidence_unavailable'};}
 }

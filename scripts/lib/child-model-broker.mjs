@@ -7,6 +7,7 @@ import {privateStateFile} from './private-state-path.mjs';
 import {readBoundedRegularFile} from './safe-file-read.mjs';
 import {childProviderConfiguration} from './child-provider-configuration.mjs';
 import {requestChildModel} from './child-model-client.mjs';
+import {canonicalChildModelId} from './child-model-aliases.mjs';
 import {resolvePrithaStatePathFrom} from './paths.mjs';
 
 const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -58,9 +59,14 @@ export async function serveChildModel({root,stateRoot,token,request,readCredenti
   });
   let result,dispatchedAt;
   try{
-    const apiKey=await readCredential(grant.configuration.connectorId);
-    result=await requestChildModel(grant.configuration,request.input,{apiKey,fetchImpl,signal,direct:true,onDispatch:()=>{dispatchedAt=Date.now();}});
-    return result;
+    const selected=grant.configuration,apiKey=await readCredential(selected.connectorId);
+    // A provider reports the dated ID of a documented alias. Ask for that exact
+    // ID so the unchanged strict identity check still applies to the response,
+    // then answer the child with the model its accepted Contract selected.
+    const modelId=canonicalChildModelId(selected.connectorId,selected.modelId);
+    const upstream=modelId===selected.modelId?selected:childProviderConfiguration({childModelProvider:selected.connectorId,childModelId:modelId,childModelConnection:selected.connection,childMaxOutputTokens:selected.maxOutputTokens});
+    result=await requestChildModel(upstream,request.input,{apiKey,fetchImpl,signal,direct:true,onDispatch:()=>{dispatchedAt=Date.now();}});
+    return upstream===selected?result:{...result,model:selected.modelId};
   }finally{
     withFileLock(file,()=>{
       const current=read(file);if(current.tokenHash!==tokenHash)return;

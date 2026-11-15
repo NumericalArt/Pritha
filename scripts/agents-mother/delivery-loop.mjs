@@ -12,9 +12,12 @@ import { writeLifecycleReport } from "./lifecycle-report.mjs";
 import { authoredAgentId } from "./identity.mjs";
 import { contractFingerprint } from "./contract.mjs";
 import { createBuildExecutor } from "./build-executors.mjs";
+import { preparedTrialInputFiles } from "./prepared-trial-inputs.mjs";
 import {
   DELIVERY_ACTIVE_STATUSES,
   accountDeliveryExecutorResult as accountExecutorResult,
+  settleDeliveryUsageAtReservation,
+  deliveryUsageSettleable,
   budgetBlocker,
   recordedDeliveryBudgetBlocker,
   deliveryUsageStatus,
@@ -38,6 +41,7 @@ import {
   discardDeliveryIteration,
   DeliveryWorkspaceError,
   prepareDeliveryWorktree,
+  installPreparedTrialInputs,
   planDeliveryWorktreeCleanup,
   readDeliveryWorktree,
   verifyProtectedTrialInputs,
@@ -147,6 +151,20 @@ function reconcileExecutorAccounting(runRoot) {
     accountExecutorResult(runRoot, result, relative);
   }
   return readDeliveryLedger(runRoot);
+}
+
+// A build that Pritha leads herself (its Outcome carries her decision, so the
+// compiled plan says model-led) does not stop for a separate answer when an
+// ended attempt contains a request the provider never measured. It is counted
+// at the amount the host reserved for it and the run goes on. User decision of
+// 2026-11-15; reviewed and custom builds still ask the user. An attempt that
+// has not provably ended, or whose reservation is not fully known, is never
+// settled this way and blocks as before.
+function settleUnmeasuredUsage(runRoot, plan) {
+  if (plan.delivery_policy?.repair_policy !== "model-led") return false;
+  if (!deliveryUsageSettleable(readDeliveryLedger(runRoot).budget)) return false;
+  try { settleDeliveryUsageAtReservation(runRoot, { approvedBy: "pritha" }); return true; }
+  catch { return false; }
 }
 
 async function recoverExecutorAttempts(runRoot, worktree, executor, input) {
@@ -705,6 +723,11 @@ async function runDeliveryLoopLocked(input = {}) {
   mkdirSync(runRoot, { recursive: true });
   ensureRunPlan(runRoot, plan);
   let state = ensureLedger(runRoot, plan, projectPath, runId, input);
+  // Guidance supplied with a new run (a revision says what it revises) is kept
+  // in the ledger, where every build attempt and a later resume read it.
+  if (typeof input.guidance === "string" && input.guidance.trim() && !state.operator_guidance && state.status === "created") {
+    updateDeliveryLedger(runRoot, (current) => ({ ...current, operator_guidance: bounded(input.guidance) }), { eventType: "delivery_guidance_updated", payload: { source: "deliver" } });
+  }
   state = reconcileExecutorAccounting(runRoot);
   let worktree = readDeliveryWorktree(runRoot);
   if (["verified", "awaiting_acceptance", "accepted", "failed", "abandoned", "cancelled"].includes(state.status)) {
@@ -724,6 +747,9 @@ async function runDeliveryLoopLocked(input = {}) {
 
   try {
     worktree = prepareDeliveryWorktree(projectPath, runRoot, runId, input);
+    // A revision of a built agent brings its reviewed verifier with it. It is
+    // installed here, in the build worktree; the project keeps its applied version.
+    if (input.preparedTrialInputRoot) worktree = { ...worktree, ...installPreparedTrialInputs(runRoot, preparedTrialInputFiles(plan, input.preparedTrialInputRoot)) };
     state = readDeliveryLedger(runRoot);
     if (state.status === "created" || state.status === "correcting" || state.status === "paused") {
       state = transitionDelivery(runRoot, "preparing", {
@@ -755,6 +781,7 @@ async function runDeliveryLoopLocked(input = {}) {
     : 0;
   try {
     await recoverExecutorAttempts(runRoot, worktree, buildExecutor, input);
+    settleUnmeasuredUsage(runRoot, plan);
     state = readDeliveryLedger(runRoot);
     if (deliveryUsageStatus(state.budget) !== "complete" && !(input.hostOnly && hostVerificationAllowed(state.budget))) {
       return blockDelivery(runRoot, plan, worktree, budgetBlocker(state), input);
@@ -895,10 +922,13 @@ async function runDeliveryLoopLocked(input = {}) {
           const executorPath = storeExecutorResult(runRoot, error.details.executorResult, state.iteration);
           accountExecutorResult(runRoot, error.details.executorResult, executorPath);
         }
+        const settled = settleUnmeasuredUsage(runRoot, plan);
         const unresolved = readDeliveryLedger(runRoot);
         const postFailureBudget = budgetBlocker(unresolved);
         if (postFailureBudget?.code === "goal_usage_unavailable") return blockDelivery(runRoot, plan, worktree, postFailureBudget, input);
-        if ([
+        // Once its usage is counted, the ended attempt is an ordinary failed
+        // attempt: its work is verified and repaired within the same limits.
+        if (!(settled && error?.code === "goal_usage_unavailable") && [
           "manual_build_required",
           "no_git_in_place_not_implemented",
           "build_runtime_unavailable",
@@ -920,6 +950,7 @@ async function runDeliveryLoopLocked(input = {}) {
         continue;
       }
 
+      settleUnmeasuredUsage(runRoot, plan);
       const accountedState = readDeliveryLedger(runRoot);
       const postTurnBudget = budgetBlocker(accountedState);
       if (postTurnBudget?.code === "goal_usage_unavailable") return blockDelivery(runRoot, plan, worktree, postTurnBudget, input);
@@ -1002,6 +1033,13 @@ export function resolveDeliveryBlocker(runRoot, answer, options = {}) {
   }
   if (selected === "revise-outcome") return transitionDelivery(runRoot, "abandoned", { eventType: "outcome_revision_requested" }).state;
   const guidance = bounded(options.guidance || state.operator_guidance || "Operator selected the recorded retry path.", 2_000);
+  if (selected === "count-reserved") {
+    // Usage that was never measured is settled only by the user's own
+    // decision, at the amount the host reserved; the run then resumes below.
+    if (options.answeredBy !== "user") throw new DeliveryLoopError("usage_decision_actor_invalid", "Counting the reserved amount requires an explicit user decision");
+    try { settleDeliveryUsageAtReservation(runRoot, { approvedBy: "user" }); }
+    catch { throw new DeliveryLoopError("usage_settlement_unavailable", "The saved attempt can no longer be counted at its reservation; reconcile it again"); }
+  }
   if (["review-failures", "inspect-worktree", "implement-manually"].includes(selected)) {
     return updateDeliveryLedger(runRoot, (current) => ({
       ...current,

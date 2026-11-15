@@ -14,6 +14,7 @@ function RunExplanation({run,showAcceptance=true}:{run:Explanation;showAcceptanc
     {showAcceptance && ["verified","awaiting_acceptance","accepted"].includes(run.status)?<p>{run.acceptance==="accepted"?"The user accepted the result.":"Automated checks passed. Awaiting your acceptance."}</p>:null}
     <p>Build: {run.budget.tokensUsed} / {run.budget.maxTokens} tokens · {run.iteration} / {run.budget.maxIterations} attempts.</p>
     {run.budget.usageStatus!=="complete"?<p>Some usage is still unknown. Pritha must confirm usage from the previous call before another build.</p>:null}
+    {run.budget.reservedUsage?<p>This total includes a request that was stopped before the provider reported its usage. It is counted at the amount reserved for it, so the real charge may be lower.</p>:null}
     {run.budget.overrun>0?<p>The builder exceeded the agreed limit by {run.budget.overrun} tokens. Pritha retains the actual usage. Another build requires a separate budget decision.</p>:null}
   </div>;
 }

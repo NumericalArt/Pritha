@@ -146,3 +146,36 @@ test(connectorId+': a forged or stale factory parent cannot bypass occupied capa
   await assert.rejects(f.executor.execute(f.input),{code:'factory_delegation_invalid'});assert.equal(f.calls.length,0);parent.assertOwned();parent.release();db.close();
 });
 }
+
+// Stop ends a build in the middle of a provider request. The provider never
+// reports what that request cost, so recovery alone can never measure it.
+for(const connectorId of ['claude','neuraldeep']){
+test(connectorId+': recovery states what the host reserved for an interrupted request without calling it usage',async t=>{
+  const f=fixture(t,{unknown:true,connectorId});let saved;await assert.rejects(f.executor.execute(f.input),error=>{saved=error.details.executorResult;return error.code==='goal_usage_unavailable';});
+  const recover=new f.Executor({root,service:{require:async()=>assert.fail('Recovery must not probe')},launch:async()=>assert.fail('Recovery must not launch'),proveExit:()=>true});
+  const last=f.calls[0],file=path.join(last.privateRoot,'budgets',last.budgetId+'.json');
+  const write=requests=>writeFileSync(file,JSON.stringify({identity,sessionId:session,model,budgetId:last.budgetId,version:1,tokenBudget:10000,tokensUsed:null,usageKnown:false,requests}));
+  const measured={status:'measured',usage:{totalTokens:120},reservedTokens:400},cut={status:'unknown',usage:null,reservedTokens:500,upstreamAttempted:true};
+  write([measured,cut]);
+  let result=await recover.recover(f.input,saved);
+  assert.equal(result.usage_upper_bound,620);assert.equal(result.usage_status,'unknown');assert.equal(result.tokens_used,null);
+  assert.equal(result.process_exited,true);assert.equal(result.turn_status,'interrupted');
+  // An attempt whose reservation is not fully known gets no figure at all.
+  for(const requests of [[measured,{...cut,reservedTokens:undefined}],[measured,{...cut,status:'failed'}],[{...measured,usage:null},cut],[]]){
+    write(requests);result=await recover.recover(f.input,saved);
+    assert.equal(result.usage_upper_bound,undefined);assert.equal(result.usage_status,'unknown');assert.equal(result.tokens_used,null);
+  }
+  assert.equal(f.calls.length,1);
+});
+test(connectorId+': an attempt that ends on an unmeasured request reports what was reserved for it',async t=>{
+  const f=fixture(t,{connectorId}),measured={status:'measured',usage:{totalTokens:120},reservedTokens:400},cut={status:'unknown',usage:null,reservedTokens:500,upstreamAttempted:true};
+  f.executor.options.launch=async options=>{
+    const run=await f.launch(options);
+    return {...run,completion:run.completion.then(result=>({...result,ok:false,processTreeExited:true,errorCode:'provider_usage_unconfirmed',
+      budget:{version:1,tokenBudget:10000,tokensUsed:null,usageKnown:false,errorCode:'provider_usage_unconfirmed',requests:[measured,cut]}}))};
+  };
+  let saved;await assert.rejects(f.executor.execute(f.input),error=>{saved=error.details.executorResult;return error.code==='goal_usage_unavailable';});
+  assert.deepEqual({bound:saved.usage_upper_bound,status:saved.usage_status,tokens:saved.tokens_used,exited:saved.process_exited,cleanup:saved.thread_cleanup},
+    {bound:620,status:'unknown',tokens:null,exited:true,cleanup:'closed'});
+});
+}

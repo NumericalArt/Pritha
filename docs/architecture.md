@@ -146,7 +146,12 @@ Network evidence is normalized without changing App Server wire policy:
 an external sandbox with limited network. `host` is not sandbox evidence.
 
 New autonomous contracts use a user-confirmed build-token budget, proposed as
-`1,000,000`; legacy accepted contracts inherit that default. Each Codex build
+`1,000,000`; legacy accepted contracts inherit that default. Model-led local
+creation in Task Chat instead applies the stabilization profile in
+`scripts/agents-mother/factory-budget.mjs` when the request names no smaller
+limit: 10,000,000 tokens and two hours of active work for the whole workflow,
+and 24 build attempts within two hours. Explicit limits in the request remain
+binding. Each Codex build
 iteration gets an ephemeral App Server thread. Before `turn/start`, Pritha sets
 a bounded Goal containing only the run ID, spec ID, semantic lock, and
 verifiable objective, with the remaining token budget. After the turn it reads

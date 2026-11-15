@@ -4,7 +4,7 @@ import path from "node:path";
 import { resolvePrithaStatePathFrom, resolvePrithaStateRoot, resolvePrithaRoot } from "../lib/paths.mjs";
 import { findCatalogAgent, readAgentCatalog, readCatalogArtifact, readIdentityEvidence } from "./identity.mjs";
 import { normalizeDeliveryLedger, targetKey, validateDeliveryLedger } from "./delivery-ledger.mjs";
-import { approvedTrialPlan, verifyCompiledTrialPlan, latestOutcomeSpecForContract } from "./outcome-spec.mjs";
+import { approvedTrialPlan, verifyCompiledTrialPlan, outcomeSpecsForContract } from "./outcome-spec.mjs";
 import { verifyTrialResultFreshness, verifyTrialResultIntegrity } from "./trial-runner.mjs";
 
 export const RESULT_READINESS_SCHEMA = "pritha-result-readiness-v1";
@@ -87,10 +87,11 @@ export function readAgentResultReadiness(target, input = {}) {
   const stateRoot = resolvePrithaStateRoot({ ...input, root });
   const options = { ...input, root, stateRoot, fresh: true };
   const agent = findCatalogAgent(readAgentCatalog(options), target);
-  const view = { schema: RESULT_READINESS_SCHEMA, agentId: agent?.agentId || null,
+  const base = { schema: RESULT_READINESS_SCHEMA, agentId: agent?.agentId || null,
     verification: { status: "unverified", scope: "canonical-project", reason: "no-current-evidence", counts: null, head: null },
     candidate: { status: "unverified", reason: "no-current-evidence", head: null },
     acceptance: { status: "not_accepted", at: null }, run: null, evidenceIssues: 0, truncated: false };
+  const view = { ...base, verification: { ...base.verification } };
   if (input.runId !== undefined && !id(input.runId)) {
     view.verification.reason = "run-identity-invalid"; return view;
   }
@@ -101,7 +102,22 @@ export function readAgentResultReadiness(target, input = {}) {
   if (!contract || !readCatalogArtifact(agent, contract.path, options)) {
     view.verification.reason = "contract-unavailable"; return view;
   }
-  const selected = latestOutcomeSpecForContract(contract.path, options);
+  // Normally one Outcome is current. While a built agent is being revised, its
+  // successor Outcome is already approved and comes first, but the project
+  // still holds the version verified under the Outcome before it. That applied
+  // version is what the card reports and serves until the revision replaces it.
+  const specs = outcomeSpecsForContract(contract.path, options);
+  const newest = assess(specs[0] || null);
+  if (["verified", "awaiting_operator"].includes(newest.verification.status)) return newest;
+  for (const earlier of specs.slice(1).filter(row => row.status === "approved")) {
+    const applied = assess(earlier);
+    if (!["verified", "awaiting_operator"].includes(applied.verification.status)) continue;
+    return { ...applied, pending: { run: newest.run, status: newest.verification.status, reason: newest.verification.reason } };
+  }
+  return newest;
+
+  function assess(selected) {
+  const view = { ...base, verification: { ...base.verification }, candidate: { ...base.candidate }, acceptance: { ...base.acceptance } };
   const outcome = selected && agent.artifacts.find(item => item.type === "agent-outcome-spec"
     && item.contractPath === contract.path && item.path === path.resolve(root, selected.path));
   if (!outcome || !readCatalogArtifact(agent, outcome.path, options)) {
@@ -163,4 +179,5 @@ export function readAgentResultReadiness(target, input = {}) {
     view.verification.status = "unknown"; view.verification.reason = "evidence-invalid-or-unavailable";
   }
   return view;
+}
 }

@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import {createHash,randomUUID} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {childInteractionDefinition,requestChildProduct} from '../scripts/lib/child-interaction.mjs';
 
 test('first-use proxy sends to the approved path only after checking the owned process identity',async t=>{
@@ -14,10 +15,10 @@ test('first-use proxy sends to the approved path only after checking the owned p
   const file=path.join(root,'verification/product.mjs');fs.writeFileSync(file,content);
   const outcome='- Verifier input: verification/product.mjs :: sha256:'+createHash('sha256').update(content).digest('hex')+' :: host-template:api-cli-product-v2';
   const definition=childInteractionDefinition(root,outcome);assert.deepEqual(definition.examples,[{text:'hello'}]);
-  let requests=0;const instance=randomUUID();
+  let requests=0,healthBody;const instance=randomUUID();healthBody={pid:process.pid,instance_id:instance};
   const server=http.createServer(async(req,res)=>{
     res.setHeader('content-type','application/json');
-    if(req.url==='/health'){res.end(JSON.stringify({pid:process.pid,instance_id:instance}));return;}
+    if(req.url==='/health'){res.end(JSON.stringify(healthBody));return;}
     requests++;assert.equal(req.url,'/run');let body='';for await(const chunk of req)body+=chunk;res.end(JSON.stringify({answer:JSON.parse(body).text}));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);}));
@@ -27,6 +28,18 @@ test('first-use proxy sends to the approved path only after checking the owned p
   assert.deepEqual((await requestChildProduct(options)).output,{answer:options.input.text});assert.equal(requests,1);
   save({...record,instance_id:'foreign'});await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});assert.equal(requests,1);
   save({...record,project_root:'/different-child'});await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});
+  // The documented managed protocol requires only instance_id at /health. A
+  // generated server that omits its pid is still the recorded live process.
+  save(record);healthBody={status:'ok',instance_id:instance};
+  assert.deepEqual((await requestChildProduct(options)).output,{answer:options.input.text});assert.equal(requests,2);
+  // A reported pid that disagrees with the record, a malformed identity and a
+  // record whose process no longer exists are never trusted.
+  healthBody={instance_id:instance,pid:process.pid+1};await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});
+  healthBody=[instance];await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});
+  const exited=spawnSync(process.execPath,['-e','']).pid;healthBody={instance_id:instance};
+  save({...record,pid:exited});await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});
+  healthBody={instance_id:instance,pid:exited};await assert.rejects(requestChildProduct(options),{code:'agent_runtime_unverified'});
+  assert.equal(requests,2);save(record);healthBody={pid:process.pid,instance_id:instance};
   await assert.rejects(requestChildProduct({...options,upstream:'https://example.invalid'}),{code:'agent_endpoint_invalid'});
   fs.appendFileSync(file,'changed');assert.throws(()=>childInteractionDefinition(root,outcome),{code:'agent_verification_changed'});
 });

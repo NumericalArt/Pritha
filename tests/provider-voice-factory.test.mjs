@@ -10,7 +10,11 @@ import {factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs
 import {ExecutionCoordinator} from '../scripts/lib/execution-coordinator.mjs';
 import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact,factoryHash,readFactoryConversation,patchFactoryDraft,validateFactoryBuildEffort,inheritedFactoryBuildEffort} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {executeVoiceFactoryStep} from '../scripts/agents-mother/voice-factory-worker.mjs';
-import {reconcileFactoryReceipt} from '../scripts/agents-mother/factory-receipt-recovery.mjs';
+import {reconcileFactoryReceipt,releaseInterruptedFactoryStep} from '../scripts/agents-mother/factory-receipt-recovery.mjs';
+import {buildInterrupted} from '../scripts/agents-mother/factory-interruption.mjs';
+import {nextFactoryAction} from '../scripts/agents-mother/factory-continuation.mjs';
+import {factoryMilestone} from '../scripts/agents-mother/factory-milestone.mjs';
+import {readBoundFactoryProgress} from '../scripts/agents-mother/factory-progress.mjs';
 import {privateAgentArtifactReference} from '../scripts/lib/authored-agent-memory.mjs';
 import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs';
 import {contractData} from '../scripts/agents-mother/contract.mjs';
@@ -484,4 +488,108 @@ test('compatibility input corrections identify missing required fields without e
   });
   assert.deepEqual(detail.missingFields,['expected_sha256']);assert.equal(detail.unexpectedFieldCount,1);assert.equal(detail.operationIdValid,true);assert.equal(detail.suggestedTool,'factory_approve_contract');
   assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_UNKNOWN_FIELD|private-value/);assert.equal(f.approvals.length,0);assert.equal(f.state(),null);
+});
+
+// Stop, a timeout or a host restart kills the build worker before it writes a
+// receipt. The session then kept claiming the step was running and refused
+// every later action (observed 2026-11-14: a stopped NeuralDeep build).
+function interruptedBuild(f,{action='deliver',runId,continuationProfile='api-local-v1'}={}){
+  const id='interrupted_build_01',turnId=f.options.turnId,key='provider-tool:'+turnId+':'+id,input={operation_id:id,action};
+  const work=path.join(f.p.directory,'operations','0f8fad5b-d9cb-469f-a165-70867728950e');fs.mkdirSync(work,{recursive:true,mode:0o700});
+  const base=f.state(),state={...base,phase:'scaffolded',revision:base.revision+1,running:{operationId:id,action,turnId},...(continuationProfile?{continuationProfile}:{}),...(runId?{runId}:{})};
+  fs.writeFileSync(path.join(work,'request.json'),JSON.stringify({version:1,root:f.p.root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,chatId:f.options.chatId,connectorId:f.options.connectorId,
+    factoryParent:{owner:f.lease.owner,generation:f.lease.generation},state,input,resultFile:path.join(work,'result.json')}),{mode:0o600});
+  f.coordinator.reserveIntent(key,factoryHash(['factory_step',input]),{kind:'provider-tool',chatId:f.options.chatId,turnId,operationId:id,tool:'factory_step',owner:f.lease.owner,generation:f.lease.generation,factoryAction:action,factoryTarget:f.p.target,connectorId:f.options.connectorId});
+  f.coordinator.updateIntent(key,{processProof:{version:1},factoryWorkDirectory:work});
+  fs.writeFileSync(f.p.file,JSON.stringify(state));
+  return {work,state,id};
+}
+test('an interrupted build step is released only after its lease and process are gone and no receipt exists',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+  const {work,state}=interruptedBuild(f,{runId:'voice-voice-built-1a2b3c4d'}),exited={proveExit:()=>true,findRun:()=>null};
+  assert.equal(releaseInterruptedFactoryStep(f.p,f.options,exited),false,'the turn that started the worker still owns it');
+  f.lease.release();
+  const lease=f.coordinator.claim(['fixture','workspace:'+f.p.target],'next-factory-owner',{kind:'turn'});
+  try {
+    const owner={...f.options,lease,turnId:'turn_after_stop'};
+    assert.equal(releaseInterruptedFactoryStep(f.p,owner,{...exited,proveExit:()=>false}),false,'a live or unproven process is never released');
+    const receipt=path.join(work,'result.json');fs.writeFileSync(receipt,'{}');
+    assert.equal(releaseInterruptedFactoryStep(f.p,owner,exited),false,'a finished receipt is recovered, never discarded');fs.unlinkSync(receipt);
+    assert.equal(f.state().running.action,'deliver');
+    // The run identity was saved but no ledger exists: nothing was dispatched.
+    const released=releaseInterruptedFactoryStep(f.p,owner,exited);
+    assert.deepEqual({action:released.action,runPresent:released.runPresent},{action:'deliver',runPresent:false});
+    const saved=f.state();
+    assert.equal(saved.running,null);assert.equal(saved.runId,undefined);assert.equal(saved.revision,state.revision);assert.equal(saved.contract,state.contract);
+    assert.equal(saved.continuationPause,'deliver');assert.equal(saved.interruptedStep.action,'deliver');assert.equal(buildInterrupted(saved),true);
+    assert.equal(releaseInterruptedFactoryStep(f.p,owner,exited),false,'a released step is released once');
+    assert.deepEqual(nextFactoryAction({...saved,contractApproval:{},outcome:'x',outcomeApproval:{},scaffoldRevision:'abc'},null),{kind:'step',action:'deliver'});
+    assert.equal(f.approvals.length,0);
+  } finally {lease.release();}
+});
+test('an existing run keeps its identity when its interrupted step is released; other steps stay unconfirmed',async t=>{
+  for(const [action,runId,found,expected] of [['delivery_resume','voice-voice-built-1a2b3c4d',true,true],['verify','voice-voice-built-1a2b3c4d',true,true],
+    ['delivery_resume','voice-voice-built-1a2b3c4d',false,false],['scaffold',undefined,false,false],['approve_contract',undefined,false,false]]){
+    const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+    interruptedBuild(f,{action,runId,continuationProfile:null});f.lease.release();
+    const lease=f.coordinator.claim(['fixture','workspace:'+f.p.target],'next-factory-owner',{kind:'turn'});
+    try {
+      const result=releaseInterruptedFactoryStep(f.p,{...f.options,lease,turnId:'turn_after_stop'},{proveExit:()=>true,findRun:()=>found?'/run':null});
+      assert.equal(Boolean(result),expected,action);
+      const saved=f.state();
+      if(!expected){assert.equal(saved.running.action,action);continue;}
+      assert.equal(saved.running,null);assert.equal(saved.runId,runId);assert.equal(saved.interruptedStep.runPresent,true);
+      assert.equal(saved.continuationPause,undefined,'a custom workflow has no automatic continuation to pause');
+    } finally {lease.release();}
+  }
+});
+test('the next turn after a stopped build is told to continue, and factory_continue releases the step without a second build',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+  interruptedBuild(f);
+  const status=JSON.parse((await f.tools.call('factory_status',{})).content[0].text);
+  assert.deepEqual({owner:status.nextStep.owner,action:status.nextStep.action,reason:status.nextStep.reason,step:status.nextStep.unconfirmedStep},{owner:'model',action:'continue',reason:'step_unconfirmed',step:'deliver'});
+  // The chat page reads the same state without changing it: with no turn left to own the step, it is not shown as running.
+  const view=turnActive=>readBoundFactoryProgress({root,stateRoot:f.p.stateRoot,agentParent:f.p.parent,slug:f.p.slug,target:f.p.target,chatId:f.options.chatId,connectorId:f.options.connectorId,turnActive});
+  const before=fs.readFileSync(f.p.file,'utf8'),idle=view(false);
+  assert.deepEqual({running:idle.running,label:idle.milestone.label},{running:false,label:'Build paused'});assert.equal(view(true).running,true);assert.equal(view(undefined).running,true);
+  assert.equal(fs.readFileSync(f.p.file,'utf8'),before);
+  assert.match(status.nextStep.hint,/never starts a second build/);
+  // The original turn still owns the worker: nothing is released under it.
+  await assert.rejects(f.call('continue'),error=>{assert.equal(error.code,'factory_step_unconfirmed');assert.match(factoryBriefErrorDetail(error).hint,/Do not repeat the step/);return true;});
+  f.lease.release();
+  const lease=f.coordinator.claim(['fixture','workspace:'+f.p.target],'next-factory-owner',{kind:'turn'}),controller=new AbortController();
+  const next=new ProviderHostTools({...f.options,lease,turnId:'turn_after_stop',signal:controller.signal});
+  try {
+    // No live process matches the saved proof in this fixture, so exit is proven by the real snapshot.
+    f.coordinator.updateIntent('provider-tool:turn_factory:interrupted_build_01',{processProof:{version:1,session:2147483646,escaped:[],coverage:'observed'}});
+    const continued=JSON.parse((await next.call('factory_continue',{operation_id:'continue-after-stop-01'})).content[0].text);
+    assert.equal(continued.status,'completed',continued.text);
+    const saved=f.state();
+    assert.equal(saved.running,null);assert.equal(saved.continuationPause,'deliver');assert.equal(buildInterrupted(saved),true);
+    assert.equal(factoryMilestone(saved,null,null).label,'Build paused');
+    assert.equal(fs.existsSync(f.p.target),false);assert.equal(f.approvals.length,0);
+  } finally {controller.abort();await next.close();lease.release();}
+});
+test('a built agent says whether and how it can be revised instead of refusing step after step',async t=>{
+  const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});
+  const built={...f.state(),contractApproval:{},outcome:'outcome',outcomeApproval:{},runId:'voice-voice-built-1a2b3c4d',phase:'awaiting-manual-acceptance',localApplication:{status:'applied',runId:'voice-voice-built-1a2b3c4d'}};
+  const ledger={run_id:built.runId,status:'awaiting_acceptance',blockers:[],budget:{legacy_usage_unverified:false,unaccounted_attempts:[],tokens_used:1,max_tokens:2}};
+  // A custom draft workflow keeps no structured examples to revise from.
+  const custom=f.tools.factory.nextStep(built,ledger);
+  assert.deepEqual({owner:custom.owner,reason:custom.reason,revision:custom.revisionAfterBuild},{owner:'user',reason:'manual_acceptance',revision:{available:false,reason:'custom_workflow'}});
+  assert.match(custom.hint,/Do not call propose, scaffold or deliver/);
+  assert.doesNotMatch(factoryMilestone(built,{status:'awaiting_acceptance',blockers:[]},{disposition:'applied-local-project'}).summary,/describe the change/);
+  // An agent created from a structured proposal is revised through factory_improve until the user accepts it.
+  const proposed={...built,preparation:{productHash:'a'.repeat(64)}};
+  const open=f.tools.factory.nextStep(proposed,ledger);
+  assert.deepEqual(open.revisionAfterBuild,{available:true,action:'improve',requiredFields:['product'],optionalFields:['note']});
+  assert.match(open.hint,/factory_improve with the COMPLETE revised product examples/);assert.match(open.hint,/Do not resend brief/);
+  assert.match(factoryMilestone(proposed,{status:'awaiting_acceptance',blockers:[]},{disposition:'applied-local-project'}).summary,/describe the change in this chat/);
+  for(const [patch,ledgerPatch,reason] of [[{},{status:'accepted'},'accepted'],[{},{accepted_by:'user'},'accepted'],[{localApplication:{status:'pending',reason:'source_has_changes'}},{},'not_applied'],[{localApplication:{status:'applied',runId:'another-run'}},{},'not_applied']])
+    assert.deepEqual(f.tools.factory.nextStep({...proposed,...patch},{...ledger,...ledgerPatch}).revisionAfterBuild,{available:false,reason},reason);
+  const detail=factoryBriefErrorDetail(Object.assign(new Error('x'),{code:'factory_delivery_already_started'}));
+  assert.match(detail.hint,/second build cannot be started/);assert.match(detail.hint,/factory_improve/);assert.match(detail.hint,/Nothing was changed/);
+  const refused=factoryBriefErrorDetail(Object.assign(new Error('x'),{code:'factory_improvement_unavailable',reason:'accepted'}));
+  assert.deepEqual({error:refused.error,reason:refused.reason},{error:'factory_improvement_unavailable',reason:'accepted'});assert.match(refused.hint,/accepted agent is not changed/);
+  assert.equal(factoryBriefErrorDetail(Object.assign(new Error('x'),{code:'factory_improvement_unavailable',reason:'<script>'})).reason,'unavailable');
 });

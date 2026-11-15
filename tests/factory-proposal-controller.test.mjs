@@ -11,6 +11,8 @@ import {voiceFactoryPaths,loadVoiceFactory,factoryArtifact} from '../scripts/age
 import {productFactoryFixture,until} from './helpers/product-factory.mjs';
 import {PROVIDER_FACTORY_TOOLS,factoryBriefErrorDetail} from '../scripts/lib/provider-factory-tools.mjs';
 import {validateProductProposal} from '../scripts/agents-mother/factory-product-proposal.mjs';
+import {canonicalChildModelId,childModelRetirement} from '../scripts/lib/child-model-aliases.mjs';
+import {declaredAgentPorts,suggestAgentPort} from '../scripts/agents-mother/agent-ports.mjs';
 
 const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],['neuraldeep','gpt-oss-20b','neuraldeep','gpt-oss-20b']];
 test('proposal tools require product functions and distinguish missing functions from incorrect mappings',()=>{
@@ -79,6 +81,47 @@ test('an incomplete product proposal is corrected in the same draft before any a
   await approve(f,result,'contract');assert.equal(f.state().contract,original.file);
   await approve(f,result,'outcome');assert.equal((await result).continuationFailed,false);
   assert.equal(f.state().contractApproval.reviewedSha256,original.sha256);assert.equal(f.reviews.length,2);
+});
+test('a proposal that pins a child to a model the provider is retiring is corrected before any document exists',{timeout:30000},async t=>{
+  const f=await fixture(t,providers[1]);
+  // Both the documented alias and its dated ID name the same retiring model.
+  for(const childModelId of ['claude-sonnet-4-5','claude-sonnet-4-5-20250929']){
+    const retiring=structuredClone(f.input);retiring.brief.technical.childModelId=childModelId;
+    const rejected=await f.call('propose',retiring);
+    assert.equal(rejected.error,'factory_product_proposal_invalid');assert.equal(rejected.field,'brief.technical.childModelId');
+    assert.match(rejected.hint,/claude-sonnet-4-5-20250929 on 2026-11-30\. Select a current model of the same provider/);
+  }
+  assert.equal(f.pending().length,0);assert.equal(f.reviews.length,0);assert.equal(fs.existsSync(f.paths.target),false);
+  assert.equal(childModelRetirement('claude','claude-haiku-4-5-20251001'),null);
+  assert.equal(childModelRetirement('claude','claude-sonnet-4-5',Date.parse('2026-06-01T00:00:00Z')),null,'outside the notice window');
+  assert.deepEqual(childModelRetirement('claude','claude-sonnet-4-5',Date.parse('2026-12-01T00:00:00Z')),{modelId:'claude-sonnet-4-5-20250929',retires:'2026-11-30',retired:true});
+  assert.equal(canonicalChildModelId('claude','claude-haiku-4-5'),'claude-haiku-4-5-20251001');
+  assert.equal(canonicalChildModelId('claude','claude-sonnet-5-5'),'claude-sonnet-5-5');
+  assert.equal(canonicalChildModelId('openai','claude-haiku-4-5'),'claude-haiku-4-5');
+  assert.equal(canonicalChildModelId('claude','constructor'),'constructor');
+});
+test('a proposal cannot reuse a local API port that another agent of the instance declares',{timeout:30000},async t=>{
+  // Observed 2026-11-14: three agents declared 3000 and two pairs shared 3141 and 3187.
+  const f=await fixture(t),port=Number(f.input.brief.technical.port);assert.ok(Number.isInteger(port) && port>0);
+  const sibling=(name,manifest,agent=true)=>{const dir=path.join(f.paths.parent,name,'operations');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'manifest.json'),JSON.stringify(manifest));if(agent)fs.writeFileSync(path.join(f.paths.parent,name,'AGENTS.md'),'# Fixture agent\n');};
+  sibling('older-agent',{health_url:'http://127.0.0.1:'+port+'/health',local_upstream_url:'http://127.0.0.1:'+port});
+  sibling('default-agent',{health_url:'http://127.0.0.1:3000/health'});
+  sibling('range-start',{health_url:'http://127.0.0.1:3100/health'});
+  sibling('foreign-host',{health_url:'http://192.0.2.1:3101/health'});sibling('broken',{health_url:42});
+  // A folder that is not an agent of this instance is never read as one.
+  sibling('unrelated-project',{health_url:'http://127.0.0.1:3101/health'},false);
+  fs.mkdirSync(path.join(f.paths.parent,'no-manifest'));
+  assert.deepEqual([...declaredAgentPorts(f.paths.parent)].sort((a,b)=>a[0]-b[0]),[[3000,'default-agent'],[3100,'range-start'],[port,'older-agent']].sort((a,b)=>a[0]-b[0]));
+  assert.equal(suggestAgentPort(declaredAgentPorts(f.paths.parent)),3101);
+  const taken=await f.call('propose',f.input);
+  assert.equal(taken.error,'factory_product_proposal_invalid');assert.equal(taken.field,'brief.technical.port');
+  assert.match(taken.hint,new RegExp('^Port '+port+' is already declared by another agent of this Pritha instance or used by Pritha itself\\. Set technical\\.port to 3101 or another unused port\\.'));
+  const unnamed=structuredClone(f.input);delete unnamed.brief.technical.port;
+  const defaulted=await f.call('propose',unnamed);
+  assert.equal(defaulted.field,'brief.technical.port');assert.match(defaulted.hint,/^Port 3000, the default when no port is named, is already declared/);
+  assert.equal(f.pending().length,0);assert.equal(f.reviews.length,0);assert.equal(fs.existsSync(f.paths.target),false);
+  // The agent's own folder never blocks its own corrected proposal.
+  assert.equal(declaredAgentPorts(f.paths.parent,{exclude:path.join(f.paths.parent,'older-agent')}).has(port),false);
 });
 
 function recoveryFixture(t){

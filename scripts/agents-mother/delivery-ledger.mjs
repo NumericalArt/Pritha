@@ -473,6 +473,65 @@ export function deliveryBudgetExtensionAllowed(runRoot,state){
       || state.blockers[0].code==='verification_needs_implementation' && recordedDeliveryBudgetBlocker(runRoot,state)!==null);
 }
 
+export const RESERVED_USAGE_STATUS = "reserved-upper-bound";
+export const RESERVED_USAGE_SOURCE = "host-reservation-upper-bound";
+
+/** Every unresolved attempt has ended, its session is closed and the host
+ * knows what it reserved for the requests that were never measured. */
+export function deliveryUsageSettleable(budget) {
+  const attempts = budget?.unaccounted_attempts;
+  return budget?.legacy_usage_unverified === false && Array.isArray(attempts) && attempts.length > 0 && attempts.every((entry) =>
+    entry.reason === "usage_unavailable" && /^executor\/iteration-\d+\.json$/.test(entry.executor_result || "")
+    && ["interrupted", "failed", "completed"].includes(entry.turn_status) && ["closed", "archived"].includes(entry.thread_cleanup)
+    && Number.isSafeInteger(entry.upper_bound_tokens) && entry.upper_bound_tokens >= 0);
+}
+
+/** What counting the reservation would record, for the decision the user is
+ * asked to make. Null when the attempts cannot be settled this way. */
+export function deliveryUsageSettlement(budget) {
+  if (!deliveryUsageSettleable(budget)) return null;
+  const countedTokens = budget.unaccounted_attempts.reduce((total, entry) => {
+    const measured = budget.accounted_turns.find((turn) => turn.key === `${entry.thread_id}:${entry.turn_id}`)?.tokens_used ?? 0;
+    return total + Math.max(0, entry.upper_bound_tokens - measured);
+  }, budget.tokens_used);
+  return Number.isSafeInteger(countedTokens) ? { measuredTokens: budget.tokens_used, countedTokens, buildLimit: budget.max_tokens } : null;
+}
+
+/** Count an ended attempt at the amount the host reserved for it. The decision
+ * is the user's own answer, or Pritha's for a build she leads herself: the
+ * user decided on 2026-11-15 that such a build does not wait for a separate
+ * answer here. The caller establishes which applies; this function records it.
+ * Each saved receipt is checked against the ledger entry it settles, rewritten
+ * with the decision and accounted. Nothing is measured and no model request is
+ * made. */
+export function settleDeliveryUsageAtReservation(runRoot, { approvedBy } = {}) {
+  if (!["user", "pritha"].includes(approvedBy)) throw new Error("Counting reserved usage requires a recorded decision");
+  const state = readDeliveryLedger(runRoot);
+  if (!deliveryUsageSettleable(state.budget)) throw new Error("The saved attempt cannot be counted at its reservation");
+  const receipts = state.budget.unaccounted_attempts.map((attempt) => {
+    const file = path.join(runRoot, attempt.executor_result);
+    const receipt = parseBoundedJson(readBoundedRegularFile(file, { maxBytes: 2_000_000, allowedRoots: [runRoot] }).text, { maxBytes: 2_000_000, maxDepth: 32, maxNodes: 30000 });
+    // Every receipt is checked before the first one is rewritten: an attempt
+    // the ledger could not account afterwards must not be left half settled.
+    if (receipt.schema !== "pritha-build-executor-result-v2" || receipt.run_id !== state.run_id || receipt.process_exited !== true
+      || !["closed", "archived"].includes(receipt.thread_cleanup) || receipt.usage_status !== "unknown"
+      || typeof receipt.thread_id !== "string" || !receipt.thread_id || typeof receipt.turn_id !== "string" || !receipt.turn_id
+      || receipt.usage_upper_bound !== attempt.upper_bound_tokens) throw new Error("The saved attempt changed after it was reconciled");
+    return { file, attempt, receipt };
+  });
+  const at = new Date().toISOString();
+  for (const { file, attempt, receipt } of receipts) {
+    const settled = { ...receipt, usage_status: RESERVED_USAGE_STATUS, tokens_used: receipt.usage_upper_bound,
+      usage_decision: { by: approvedBy, at, basis: "host-reservation", measured: false,
+        ...(approvedBy === "pritha" ? { policy: "model-led-build" } : {}) } };
+    atomicWriteFile(file, `${JSON.stringify(settled, null, 2)}\n`);
+    accountDeliveryExecutorResult(runRoot, settled, attempt.executor_result);
+  }
+  const next = readDeliveryLedger(runRoot);
+  if (deliveryUsageStatus(next.budget) !== "complete") throw new Error("The saved attempt could not be counted at its reservation");
+  return next;
+}
+
 export function budgetBlocker(state, now = Date.now()) {
   const elapsed = now - Date.parse(state.created_at);
   if (deliveryUsageStatus(state.budget) !== "complete") {
@@ -481,6 +540,7 @@ export function budgetBlocker(state, now = Date.now()) {
       summary: "Build usage or the end of a prior attempt is unresolved; another model turn is not allowed.",
       question: "How should Pritha reconcile the saved build attempt before another model turn?",
       options: [
+        ...(deliveryUsageSettleable(state.budget) ? [{ id: "count-reserved", label: "Count the reserved amount", effect: "Charge the interrupted request at the amount the host reserved for it and continue this run. The provider never reported its usage, so the recorded figure may be higher than the real charge." }] : []),
         { id: "retry-accounting", label: "Reconcile usage", effect: "Inspect the bound native thread and saved receipt without resending a model turn." },
         { id: "verify-only", label: "Verify existing work", effect: "Run the approved Trials without a model turn, once the saved attempt is confirmed stopped." },
         { id: "inspect-worktree", label: "Inspect evidence", effect: "Keep the run blocked and inspect its saved receipts and worktree." },
@@ -610,17 +670,20 @@ export function accountDeliveryExecutorResult(runRoot, result, executorPath) {
     const count = result.tokens_used;
     const status = result.usage_status ?? (result.goal_enforcement !== "waived-once" && key && Number.isSafeInteger(count) && count >= 0 ? "measured" : "unknown");
     let reason = "";
-    if (status === "measured" && key && Number.isSafeInteger(count) && count >= 0) {
+    // The user settled an attempt whose last request was never measured at
+    // the amount the host reserved for it. It is counted, and named as such.
+    const settled = status === RESERVED_USAGE_STATUS;
+    if ((status === "measured" || settled) && key && Number.isSafeInteger(count) && count >= 0) {
       const previous = budget.accounted_turns.find((entry) => entry.key === key);
       const nextCount = Math.max(previous?.tokens_used ?? 0, count);
       const nextTotal = budget.tokens_used - (previous?.tokens_used ?? 0) + nextCount;
       if (!Number.isSafeInteger(nextTotal)) reason = "token_total_out_of_range";
-      else if (previous?.usage_source && result.usage_source && previous.usage_source !== result.usage_source && previous.tokens_used !== count) reason = "conflicting_usage_sources";
+      else if (!settled && previous?.usage_source && result.usage_source && previous.usage_source !== result.usage_source && previous.tokens_used !== count) reason = "conflicting_usage_sources";
       else {
         const entry = {
           ...previous, key, thread_id: threadId, turn_id: turnId,
           tokens_used: nextCount, executor_result: previous?.executor_result || executorPath,
-          phase: "build-executor", usage_source: previous?.usage_source || result.usage_source || "legacy-goal",
+          phase: "build-executor", usage_source: settled ? RESERVED_USAGE_SOURCE : previous?.usage_source || result.usage_source || "legacy-goal",
           turn_status: result.turn_status || result.status,
           runtime_version: result.runtime_version || previous?.runtime_version || null,
           model_requested: result.model_requested || previous?.model_requested || null,
@@ -635,7 +698,8 @@ export function accountDeliveryExecutorResult(runRoot, result, executorPath) {
     if (result.thread_cleanup === "pending") reason ||= "thread_cleanup_pending";
     if (reason) unresolved.push({ executor_result: executorPath, thread_id: threadId || null, turn_id: turnId || null, phase: "build-executor", reason,
       turn_status: result.turn_status || result.status, thread_cleanup: result.thread_cleanup || "unknown",
-      reserved_tokens: ["dispatching", "running", "uncertain"].includes(result.status) && Number.isSafeInteger(result.token_budget) ? result.token_budget : 0 });
+      reserved_tokens: ["dispatching", "running", "uncertain"].includes(result.status) && Number.isSafeInteger(result.token_budget) ? result.token_budget : 0,
+      ...(Number.isSafeInteger(result.usage_upper_bound) && result.usage_upper_bound >= 0 ? { upper_bound_tokens: result.usage_upper_bound } : {}) });
     budget.unaccounted_attempts = unresolved;
     if (result.goal_enforcement === "waived-once" && status !== "not-started" && budget.goal_enforcement === "waived-once") {
       budget.goal_enforcement = "required";
@@ -647,7 +711,8 @@ export function accountDeliveryExecutorResult(runRoot, result, executorPath) {
     };
   }, {
     eventType: "build_usage_recorded",
-    payload: { executor_result: executorPath, thread_id: result.thread_id || null, turn_id: result.turn_id || null, usage_status: result.usage_status || "legacy" },
+    payload: { executor_result: executorPath, thread_id: result.thread_id || null, turn_id: result.turn_id || null, usage_status: result.usage_status || "legacy",
+      ...(["user", "pritha"].includes(result.usage_decision?.by) ? { usage_decision_by: result.usage_decision.by } : {}) },
   }).state;
 }
 

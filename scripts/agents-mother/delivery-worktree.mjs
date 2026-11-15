@@ -370,6 +370,53 @@ export function verifyProtectedTrialInputs(snapshotOrPath, worktreeValue) {
   return { ok: changes.length === 0, changes };
 }
 
+/** Host preparation of a run that revises an existing project. The reviewed
+ * verifier files, already checked against the hashes the approved plan
+ * declares, replace the ones inherited from the applied version. This happens
+ * on the delivery branch only and before the run captures its protected
+ * baseline; the project itself is not touched. A worktree that was already
+ * prepared is left as it is, so resuming a run repeats nothing. */
+export function installPreparedTrialInputs(runRoot, files) {
+  const metadata = readDeliveryWorktree(runRoot);
+  if (!metadata) throw new DeliveryWorkspaceError("worktree_metadata_missing", "Delivery worktree metadata is missing");
+  if (metadata.prepared_revision) return metadata;
+  const worktree = regularDirectory(metadata.worktree, "worktree");
+  const branch = git(worktree, ["branch", "--show-current"]).trim();
+  if (branch !== metadata.branch || !branch.startsWith("pritha/build-")) {
+    throw new DeliveryWorkspaceError("worktree_branch_mismatch", "Refusing to prepare outside the delivery branch");
+  }
+  if (!Array.isArray(files) || !files.length || files.length > 64 || files.some((file) => !safeRelativePath(file?.path)
+    || !file.path.startsWith("verification/") || !Buffer.isBuffer(file.content))) {
+    throw new DeliveryWorkspaceError("trial_input_path_invalid", "A revision needs its reviewed verifier files");
+  }
+  const paths = new Set(files.map((file) => file.path));
+  const changed = () => git(worktree, ["status", "--porcelain=v1", "--untracked-files=all"]).split("\n").filter(Boolean).map((line) => line.slice(3));
+  // Nothing has been built in this worktree yet: it is at the revision it was
+  // created from and holds no change other than an interrupted installation.
+  if (metadata.verified_checkpoint || git(worktree, ["rev-parse", "HEAD"]).trim() !== metadata.base_revision || changed().some((entry) => !paths.has(entry))) {
+    throw new DeliveryWorkspaceError("worktree_preparation_late", "Verifier files can be installed only before the first build step of a run");
+  }
+  for (const file of files) {
+    let ancestor = worktree;
+    for (const part of file.path.split("/")) {
+      ancestor = path.join(ancestor, part);
+      if (existsSync(ancestor) && lstatSync(ancestor).isSymbolicLink()) throw new DeliveryWorkspaceError("trial_input_invalid", "Prepared verifier may not cross a symlink");
+    }
+    if (existsSync(ancestor) && !lstatSync(ancestor).isFile()) throw new DeliveryWorkspaceError("trial_input_invalid", "Prepared verifier must replace a regular file");
+    atomicWriteFile(ancestor, file.content);
+  }
+  let prepared = metadata.base_revision;
+  if (changed().length) {
+    git(worktree, ["add", "--", ...paths]);
+    git(worktree, ["-c", "user.name=Pritha", "-c", "user.email=pritha@local.invalid",
+      "commit", "-m", `Pritha verifier for revised outcome: ${metadata.run_id}`]);
+    prepared = git(worktree, ["rev-parse", "HEAD"]).trim();
+  }
+  const next = { ...metadata, prepared_revision: prepared };
+  atomicWriteFile(metadataPath(runRoot), `${JSON.stringify(next, null, 2)}\n`);
+  return next;
+}
+
 export function commitVerifiedCheckpoint(runRoot, options = {}) {
   const metadata = readDeliveryWorktree(runRoot);
   if (!metadata) throw new DeliveryWorkspaceError("worktree_metadata_missing", "Delivery worktree metadata is missing");
@@ -400,7 +447,8 @@ export function discardDeliveryIteration(runRoot) {
   if (branch !== metadata.branch || !branch.startsWith("pritha/build-")) {
     throw new DeliveryWorkspaceError("worktree_branch_mismatch", "Refusing to discard changes outside the delivery branch");
   }
-  const checkpoint = metadata.verified_checkpoint || metadata.base_revision;
+  // A revision is rolled back to its installed verifier, not to the applied version's.
+  const checkpoint = metadata.verified_checkpoint || metadata.prepared_revision || metadata.base_revision;
   if (!/^[a-f0-9]{40,64}$/.test(String(checkpoint || ""))) {
     throw new DeliveryWorkspaceError("checkpoint_invalid", "Delivery rollback checkpoint is invalid");
   }

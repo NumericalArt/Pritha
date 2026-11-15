@@ -6,8 +6,11 @@ const fail=()=>Object.assign(new Error('Choose a valid action for this agent fac
 const fields={status:[],delivery_status:[],delivery_resume:['answer'],verify:[],finish:[],configure_build:['effort'],configure_build_model:['model','effort'],delivery_extend:['expected_version','add_tokens','add_iterations','add_elapsed_ms']};
 
 export function factoryControlView(runtime,binding){
+  // Every factory step runs inside a turn of this chat. Without one, a saved
+  // running marker describes a step that was stopped, not one in progress.
   return readBoundFactoryProgress({root:runtime.root,stateRoot:runtime.stateRoot,agentParent:runtime.options.agentParent,
-    slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId:binding.chatId,connectorId:runtime.connectorId,model:binding.modelId,effort:binding.effortId});
+    slug:binding.workspace.factorySlug,target:binding.workspace.factoryTarget,chatId:binding.chatId,connectorId:runtime.connectorId,model:binding.modelId,effort:binding.effortId,
+    turnActive:Boolean(runtime.activeIntent(binding.chatId))});
 }
 
 /** An operator selection is an exact request, never an approval inferred from prose. */

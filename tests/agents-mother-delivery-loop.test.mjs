@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import { FunctionBuildExecutor } from "../scripts/agents-mother/build-executors.mjs";
 import { ExecutionBackendError } from "../scripts/agents-mother/execution-backends.mjs";
-import { readDeliveryLedger, transitionDelivery,deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker } from "../scripts/agents-mother/delivery-ledger.mjs";
+import { readDeliveryLedger, transitionDelivery,deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker,deliveryUsageSettlement } from "../scripts/agents-mother/delivery-ledger.mjs";
 import {
   cleanupDeliveryRun,
   deliveryStatus,
@@ -16,6 +16,7 @@ import {
   runDeliveryLoop,
 } from "../scripts/agents-mother/delivery-loop.mjs";
 import { TRIAL_PLAN_SCHEMA } from "../scripts/agents-mother/outcome-spec.mjs";
+import { deliveryExplanation } from "../scripts/agents-mother/delivery-explanation.mjs";
 
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -540,6 +541,7 @@ test("unknown charged attempt blocks and resumes by recovering its receipt witho
   const request = { plan: plan(), projectPath: project, runRoot, runId: "run-unknown", buildExecutor: executor, trialBackend: "local", reportDir: false };
   const blocked = await runDeliveryLoop(request);
   assert.equal(blocked.state.blockers[0].code, "goal_usage_unavailable");
+  assert.equal(blocked.state.blockers[0].options.some((option) => option.id === "count-reserved"), false, "an attempt with no known reservation cannot be settled");
   assert.equal(blocked.state.budget.tokens_used, 0);
   assert.equal(blocked.state.budget.unaccounted_attempts.length, 1);
   const initialTrials = readFileSync(path.join(runRoot, "trial-results/verification-001.json"), "utf8");
@@ -554,6 +556,156 @@ test("unknown charged attempt blocks and resumes by recovering its receipt witho
   await runDeliveryLoop(request);
   assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 211);
   assert.equal(executions, 1);
+});
+
+test("an interrupted request that was never measured is counted at its reservation only by the user's decision", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-count-reserved-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-reserved");
+  let executions = 0;
+  // Stop cut the first attempt off mid-request: it ended, its session is
+  // closed, and the provider never reported what that request cost.
+  const interrupted = (runId) => chargedResult({ run_id: runId, status: "interrupted", turn_status: "interrupted", process_exited: true, thread_cleanup: "closed",
+    tokens_used: null, usage_status: "unknown", usage_upper_bound: 300, usage_source: "neuraldeep-host-response", goal_enforcement: "not-applicable" });
+  const executor = {
+    name: "fixture-charged-build",
+    async execute({ worktree, runId }) {
+      if (++executions === 1) throw new ExecutionBackendError("goal_usage_unavailable", "fixture usage missing", { executorResult: interrupted(runId) });
+      writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+      return chargedResult({ run_id: runId, thread_id: "second-thread", turn_id: "second-turn", tokens_used: 50, goal_enforcement: "not-applicable" });
+    },
+    async recover() { assert.fail("a settled attempt is not recovered again"); },
+    close() {},
+  };
+  const request = { plan: plan(), projectPath: project, runRoot, runId: "run-reserved", buildExecutor: executor, trialBackend: "local", reportDir: false };
+  const blocked = await runDeliveryLoop(request);
+  assert.equal(blocked.state.blockers[0].code, "goal_usage_unavailable");
+  assert.equal(blocked.state.blockers[0].options[0].id, "count-reserved");
+  assert.equal(blocked.state.budget.tokens_used, 0);
+  assert.equal(blocked.state.budget.unaccounted_attempts[0].upper_bound_tokens, 300);
+  // The decision card states exactly what the user is asked to record.
+  assert.deepEqual(deliveryUsageSettlement(blocked.state.budget), { measuredTokens: 0, countedTokens: 300, buildLimit: blocked.state.budget.max_tokens });
+  const partlyMeasured = { ...blocked.state.budget, tokens_used: 120, accounted_turns: [{ key: "charged-thread:charged-turn", tokens_used: 120 }] };
+  assert.equal(deliveryUsageSettlement(partlyMeasured).countedTokens, 300, "an earlier measured checkpoint of the same attempt is not counted twice");
+  assert.equal(deliveryUsageSettlement({ ...blocked.state.budget, legacy_usage_unverified: true }), null);
+  const resume = (extra) => resumeDelivery("run-reserved", { root: project, stateRoot, allowDraft: true, answer: "count-reserved", buildExecutor: executor, trialBackend: "local", reportDir: false, ...extra });
+  // A receipt the ledger could not account afterwards is refused before anything is rewritten.
+  const receiptFile = path.join(runRoot, "executor/iteration-001.json"), savedReceipt = readFileSync(receiptFile, "utf8");
+  writeFileSync(receiptFile, JSON.stringify({ ...JSON.parse(savedReceipt), thread_id: null }));
+  await assert.rejects(resume({ answeredBy: "user" }), { code: "usage_settlement_unavailable" });
+  assert.equal(JSON.parse(readFileSync(receiptFile, "utf8")).usage_status, "unknown");
+  assert.equal(readDeliveryLedger(runRoot).status, "blocked");
+  writeFileSync(receiptFile, savedReceipt);
+  // The builder cannot settle its own usage: the decision belongs to the user.
+  await assert.rejects(resume({}), { code: "usage_decision_actor_invalid" });
+  await assert.rejects(resume({ answeredBy: "pritha" }), { code: "usage_decision_actor_invalid" });
+  assert.equal(readDeliveryLedger(runRoot).status, "blocked");
+  assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 0);
+  assert.equal(executions, 1);
+  const continued = await resume({ answeredBy: "user" });
+  assert.equal(continued.state.status, "verified");
+  assert.equal(executions, 2, "the same run continues with the next build attempt");
+  assert.equal(continued.state.budget.tokens_used, 350);
+  assert.equal(continued.state.budget.unaccounted_attempts.length, 0);
+  const settled = continued.state.budget.accounted_turns.find((turn) => turn.executor_result === "executor/iteration-001.json");
+  assert.deepEqual({ tokens: settled.tokens_used, source: settled.usage_source }, { tokens: 300, source: "host-reservation-upper-bound" });
+  const receipt = JSON.parse(readFileSync(path.join(runRoot, "executor/iteration-001.json"), "utf8"));
+  assert.deepEqual({ status: receipt.usage_status, tokens: receipt.tokens_used, by: receipt.usage_decision.by, measured: receipt.usage_decision.measured },
+    { status: "reserved-upper-bound", tokens: 300, by: "user", measured: false });
+  const events = readFileSync(path.join(runRoot, "events.jsonl"), "utf8");
+  assert.match(events, /"answer":"count-reserved"/);
+  await runDeliveryLoop(request);
+  assert.equal(readDeliveryLedger(runRoot).budget.tokens_used, 350, "a later read does not charge the settled attempt twice");
+});
+
+// User decision of 2026-11-15: a build that Pritha leads herself counts such an
+// attempt at its reservation without asking. Reviewed builds, above, still ask.
+test("a build Pritha leads counts an ended unmeasured attempt at its reservation and goes on", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-model-led-reserved-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-model-led");
+  const modelLed = { ...plan(), delivery_policy: { repair_policy: "model-led" } };
+  let executions = 0;
+  const unmeasured = (runId, extra = {}) => chargedResult({ run_id: runId, status: "failed", turn_status: "interrupted", process_exited: true, thread_cleanup: "closed",
+    tokens_used: null, usage_status: "unknown", usage_upper_bound: 300, usage_source: "neuraldeep-host-response", goal_enforcement: "not-applicable", ...extra });
+  const executor = {
+    name: "fixture-charged-build",
+    async execute({ worktree, runId }) {
+      if (++executions === 1) throw new ExecutionBackendError("goal_usage_unavailable", "fixture usage missing", { executorResult: unmeasured(runId) });
+      writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+      return chargedResult({ run_id: runId, thread_id: "second-thread", turn_id: "second-turn", tokens_used: 50, goal_enforcement: "not-applicable" });
+    },
+    async recover() { assert.fail("an attempt that already ended is not recovered"); },
+    close() {},
+  };
+  const result = await runDeliveryLoop({ plan: modelLed, projectPath: project, runRoot, runId: "run-model-led", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  assert.equal(result.state.status, "verified", "no decision was requested");
+  assert.equal(executions, 2);
+  assert.equal(result.state.budget.tokens_used, 350);
+  assert.equal(result.state.budget.unaccounted_attempts.length, 0);
+  const counted = result.state.budget.accounted_turns.find((turn) => turn.executor_result === "executor/iteration-001.json");
+  assert.deepEqual({ tokens: counted.tokens_used, source: counted.usage_source }, { tokens: 300, source: "host-reservation-upper-bound" });
+  const receipt = JSON.parse(readFileSync(path.join(runRoot, "executor/iteration-001.json"), "utf8"));
+  assert.deepEqual({ status: receipt.usage_status, by: receipt.usage_decision.by, policy: receipt.usage_decision.policy, measured: receipt.usage_decision.measured },
+    { status: "reserved-upper-bound", by: "pritha", policy: "model-led-build", measured: false });
+  assert.match(readFileSync(path.join(runRoot, "events.jsonl"), "utf8"), /"usage_decision_by":"pritha"/);
+  // The status shown to the user says that part of the total is a reservation.
+  assert.equal(deliveryExplanation(result.state).budget.reservedUsage, true);
+  assert.equal(deliveryExplanation({ ...result.state, budget: { ...result.state.budget, accounted_turns: result.state.budget.accounted_turns.map((turn) => ({ ...turn, usage_source: "goal" })) } }).budget.reservedUsage, undefined);
+});
+
+test("a build Pritha leads still stops when the attempt has not provably ended or its reservation is unknown", async () => {
+  for (const [name, patch] of [["running", { status: "uncertain", turn_status: "unknown", process_exited: false, thread_cleanup: "pending" }], ["no-reservation", { usage_upper_bound: undefined }]]) {
+    const project = repository();
+    const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-model-led-blocked-"));
+    const runRoot = path.join(stateRoot, "builds", "fixture-agent", `run-${name}`);
+    let executions = 0;
+    const executor = {
+      name: "fixture-charged-build",
+      async execute({ runId }) {
+        executions++;
+        throw new ExecutionBackendError("goal_usage_unavailable", "fixture usage missing", { executorResult: chargedResult({ run_id: runId, status: "failed", turn_status: "interrupted", process_exited: true,
+          thread_cleanup: "closed", tokens_used: null, usage_status: "unknown", usage_upper_bound: 300, goal_enforcement: "not-applicable", ...patch }) });
+      },
+      close() {},
+    };
+    const blocked = await runDeliveryLoop({ plan: { ...plan(), delivery_policy: { repair_policy: "model-led" } }, projectPath: project, runRoot, runId: `run-${name}`, buildExecutor: executor, trialBackend: "local", reportDir: false });
+    assert.equal(blocked.state.status, "blocked", name);
+    assert.equal(blocked.state.blockers[0].code, "goal_usage_unavailable");
+    assert.equal(blocked.state.budget.tokens_used, 0);
+    assert.equal(blocked.state.blockers[0].options.some((option) => option.id === "count-reserved"), false);
+    assert.equal(executions, 1);
+  }
+});
+
+test("a stopped build Pritha leads resumes by itself once the interrupted attempt is recovered", async () => {
+  const project = repository();
+  const stateRoot = mkdtempSync(path.join(os.tmpdir(), "pritha-loop-model-led-resume-"));
+  const runRoot = path.join(stateRoot, "builds", "fixture-agent", "run-stopped");
+  const modelLed = { ...plan(), delivery_policy: { repair_policy: "model-led" } };
+  let executions = 0, recoveries = 0;
+  const executor = {
+    name: "fixture-charged-build",
+    async execute({ worktree, runId }) {
+      // Stop: the worker ended while its request was in flight.
+      if (++executions === 1) throw new ExecutionBackendError("goal_usage_unavailable", "fixture stopped", { executorResult: chargedResult({ run_id: runId, executor: "fixture-charged-build", status: "uncertain", turn_status: "unknown",
+        process_exited: false, thread_cleanup: "pending", tokens_used: null, usage_status: "unknown", goal_enforcement: "not-applicable" }) });
+      writeFileSync(path.join(worktree, "implementation.txt"), "ready\n");
+      return chargedResult({ run_id: runId, thread_id: "second-thread", turn_id: "second-turn", tokens_used: 50, goal_enforcement: "not-applicable" });
+    },
+    async recover(input, saved) {
+      recoveries++;
+      return { ...saved, status: "interrupted", turn_status: "interrupted", process_exited: true, thread_cleanup: "closed", usage_upper_bound: 300 };
+    },
+    close() {},
+  };
+  const request = { plan: modelLed, projectPath: project, runRoot, runId: "run-stopped", buildExecutor: executor, trialBackend: "local", reportDir: false };
+  const stopped = await runDeliveryLoop(request);
+  assert.equal(stopped.state.blockers[0].code, "goal_usage_unavailable");
+  const resumed = await resumeDelivery("run-stopped", { root: project, stateRoot, allowDraft: true, answer: "retry-accounting", buildExecutor: executor, trialBackend: "local", reportDir: false });
+  assert.equal(resumed.state.status, "verified");
+  assert.deepEqual({ executions, recoveries, tokens: resumed.state.budget.tokens_used }, { executions: 2, recoveries: 1, tokens: 350 });
+  assert.equal(JSON.parse(readFileSync(path.join(runRoot, "executor/iteration-001.json"), "utf8")).usage_decision.by, "pritha");
 });
 
 test("failed receipt recovery keeps unknown usage blocked without another build", async () => {

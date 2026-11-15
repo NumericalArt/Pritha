@@ -29,6 +29,13 @@ const responseModelMatches=(requested,returned)=>returned===requested
   // but SSE reports the base model, including a terminal native tool call.
   // Preserve the requested alias on the wire; do not strip arbitrary suffixes.
   || requested==='qwen3.6-35b-a3b-noreason' && returned==='qwen3.6-35b-a3b';
+// A refused identity used to leave no trace of what the provider actually
+// answered, so a new equivalence could not be reviewed (qwen3.8-27b, observed
+// 2026-11-14). Keep both public model IDs with the error; nothing else from the
+// response is retained, and the response itself is still refused.
+const modelId=value=>typeof value==='string' && /^[A-Za-z0-9][A-Za-z0-9._:\/+\-]{0,199}$/.test(value)?value:null;
+const identityMismatch=(requested,returned)=>Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502,
+  modelDiagnostic:{requested:modelId(requested),returned:modelId(returned)}});
 // NeuralDeep advertises a 900-second gateway deadline; allow its terminal response to arrive.
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 930_000;
 const upstreamDispatchers = new WeakMap();
@@ -213,7 +220,7 @@ export function createNeuralDeepAdapter(options = {}) {
     let pendingModelMetadata=false;
     const projectResponse=value=>{
       if(!toolMapping)return value;
-      if((value?.model || pendingModelMetadata) && !responseModelMatches(responsesPayload?.model,value?.model))throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
+      if((value?.model || pendingModelMetadata) && !responseModelMatches(responsesPayload?.model,value?.model))throw identityMismatch(responsesPayload?.model,value?.model);
       return Array.isArray(value?.output)?{...value,output:value.output.map(item=>wireCall(item,toolMapping))}:value;
     };
     const transformResponseStream=raw=>{
@@ -235,7 +242,7 @@ export function createNeuralDeepAdapter(options = {}) {
             // complete stream are verified. Never normalize an actual result
             // from another model or release a tool on provisional metadata.
             if(response.headersSent || !['queued','in_progress'].includes(event.response.status)
-              || !Array.isArray(event.response.output) || event.response.output.length)throw Object.assign(new Error('Provider model identity changed.'),{code:'neuraldeep_model_identity_mismatch',statusCode:502});
+              || !Array.isArray(event.response.output) || event.response.output.length)throw identityMismatch(responsesPayload?.model,event.response.model);
             pendingModelMetadata=true;
             const {model:unverifiedModel,...metadata}=event.response;event.response=metadata;
           }else event.response=projectResponse(event.response);
@@ -463,6 +470,7 @@ export function createNeuralDeepAdapter(options = {}) {
         upstreamAttempted,
         usage: providerUsage,
         ...(error?.toolDiagnostic?{toolDiagnostic:error.toolDiagnostic}:{}),
+        ...(error?.modelDiagnostic?{modelDiagnostic:error.modelDiagnostic}:{}),
         error: classifyNeuralDeepProviderError({
           status: Number.isInteger(error?.statusCode) ? error.statusCode : null,
           transportCode: cancellationReason || (error?.name === "AbortError" ? "provider_timeout" : error?.code),

@@ -18,6 +18,17 @@ export function childInteractionDefinition(projectPath,outcomeText){
   return {path:examples[0].path,examples:examples.filter(c=>c.path===examples[0].path).map(c=>c.input_json)};
 }
 
+const recordedProcessAlive=pid=>{try{process.kill(pid,0);return true;}catch{return false;}};
+/** The managed-process protocol given to builders requires /health to return
+ * the launch instance_id; the managed Stop Trial verifies exactly that. A
+ * reported pid must still agree with the service record. The recorded process
+ * is checked with the operating system, so a server that follows the
+ * documented protocol without echoing its pid remains usable from its card. */
+function ownedRuntime(identity,record){
+  return Boolean(identity) && typeof identity==='object' && !Array.isArray(identity) && identity.instance_id===record.instance_id
+    && (identity.pid===undefined || identity.pid===record.pid) && recordedProcessAlive(record.pid);
+}
+
 /** Same-origin Control Center proxy: destination and shape come from the
  * approved protected Trial, never a URL supplied by the browser. */
 export async function requestChildProduct({projectPath,upstream,definition,input,fetchImpl=globalThis.fetch,signal}){
@@ -36,7 +47,7 @@ export async function requestChildProduct({projectPath,upstream,definition,input
   try{
     const health=await fetchImpl(url.origin+'/health',{redirect:'error',signal:AbortSignal.any([requestSignal,AbortSignal.timeout(3000)])});
     const identity=JSON.parse(await bounded(health,8000));
-    if(!health.ok || identity.instance_id!==record.instance_id || identity.pid!==record.pid)throw fail('agent_runtime_unverified');
+    if(!health.ok || !ownedRuntime(identity,record))throw fail('agent_runtime_unverified');
     const response=await fetchImpl(url.origin+definition.path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input),redirect:'error',signal:requestSignal});
     const text=await bounded(response,65536);let output;try{output=JSON.parse(text);}catch{output=text;}
     return {ok:response.ok,status:response.status,output};

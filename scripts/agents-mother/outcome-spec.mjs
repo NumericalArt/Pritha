@@ -594,10 +594,41 @@ export function createOutcomeSpec(contractPath, options = {}) {
   const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root, stateRoot: options.stateRoot }), "contracts");
   mkdirSync(contractDir, { recursive: true });
   const date = options.date || today();
+  // A revision of a built agent keeps its accepted Contract and gets a new
+  // Outcome. The draft names the approved Outcome it is meant to replace; that
+  // one stays approved and current until the revision is verified and applied.
+  const lineage = options.supersedes ? {
+    supersedes: `\n  - ${JSON.stringify(path.relative(root, path.resolve(root, options.supersedes)).replaceAll(path.sep, "/"))}`,
+    ...(Number.isSafeInteger(options.factoryOutcomeRevision) && options.factoryOutcomeRevision > 0 ? { factory_outcome_revision: String(options.factoryOutcomeRevision) } : {}),
+  } : null;
   return writeUniqueArtifact(
     path.join(contractDir, `${date}-${slug(data.agentName, { fallback: "agent" })}-agent-outcome-spec.md`),
-    ({ artifactId }) => renderOutcomeSpecFromContract(data, { ...options, date, artifactId }),
+    ({ artifactId }) => {
+      const text = renderOutcomeSpecFromContract(data, { ...options, date, artifactId });
+      return lineage ? replaceFrontmatterFields(text, lineage) : text;
+    },
   );
+}
+
+/** Take an Outcome out of use: after its successor was verified and applied
+ * (`supersededBy`), or because the revision it described ended without a
+ * verified result (no successor). The file keeps its content and history. */
+export function retireOutcomeSpec(specPath, options = {}) {
+  const root = options.root ? path.resolve(options.root) : resolvePrithaRoot();
+  const fullPath = path.resolve(root, specPath);
+  const original = readFileSync(fullPath, "utf8");
+  const parsed = parseOutcomeSpecText(original);
+  if (parsed.frontmatter.type !== "agent-outcome-spec") throw new Error("Only an agent-outcome-spec can be retired");
+  if (parsed.frontmatter.status === "superseded") return { path: fullPath, changed: false };
+  const successor = options.supersededBy ? path.relative(root, path.resolve(root, options.supersededBy)).replaceAll(path.sep, "/") : null;
+  atomicCompareAndSwapFile(fullPath, original, replaceFrontmatterFields(original, {
+    status: "superseded",
+    updated: options.date || today(),
+    review_status: "superseded",
+    outcome_spec_status: "superseded",
+    superseded_by: successor ? `\n  - ${JSON.stringify(successor)}` : "[]",
+  }));
+  return { path: fullPath, changed: true };
 }
 
 export function reviseOutcomeSpec(specPath, options = {}) {
@@ -650,7 +681,7 @@ export function outcomeSpecsForContract(contractPath, options = {}) {
   const data = contractData(contractPath, { root });
   const contractDir = path.join(resolvePrithaAgentMemoryRoot({ root, stateRoot: options.stateRoot }), "contracts");
   if (!existsSync(contractDir)) return [];
-  return readdirSync(contractDir)
+  const rows = readdirSync(contractDir)
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => path.join(contractDir, entry))
     .map((filePath) => {
@@ -665,6 +696,7 @@ export function outcomeSpecsForContract(contractPath, options = {}) {
         return {
           path: filePath,
           relPath: path.relative(root, filePath),
+          supersedes: (Array.isArray(parsed.frontmatter.supersedes) ? parsed.frontmatter.supersedes : []).filter((entry) => typeof entry === "string" && entry).map((entry) => path.resolve(root, entry)),
           status: String(parsed.frontmatter.status || "unknown"),
           id: parsed.frontmatter.id,
           semanticLock: parsed.frontmatter.outcome_semantic_lock,
@@ -677,12 +709,21 @@ export function outcomeSpecsForContract(contractPath, options = {}) {
         return null;
       }
     })
-    .filter(Boolean)
-    .sort((left, right) => {
-      const approvalRank = Number(right.status === "approved") - Number(left.status === "approved");
-      if (approvalRank) return approvalRank;
-      return path.basename(right.path).localeCompare(path.basename(left.path));
-    });
+    .filter(Boolean);
+  // A successor precedes the document it replaces whatever the file names are:
+  // two Outcomes of one Contract can be approved at once while a revision of a
+  // built agent is being verified. Depth is the length of the replaced chain.
+  const byPath = new Map(rows.map((row) => [row.path, row]));
+  const depth = (row, seen = new Set()) => {
+    if (seen.has(row.path)) return 0;
+    seen.add(row.path);
+    return 1 + Math.max(0, ...row.supersedes.map((entry) => byPath.get(entry)).filter(Boolean).map((parent) => depth(parent, seen)));
+  };
+  return rows.sort((left, right) => {
+    const approvalRank = Number(right.status === "approved") - Number(left.status === "approved");
+    if (approvalRank) return approvalRank;
+    return depth(right) - depth(left) || path.basename(right.path).localeCompare(path.basename(left.path));
+  });
 }
 
 export function latestOutcomeSpecForContract(contractPath, options = {}) {

@@ -81,6 +81,47 @@ test("production cards select the canonical folder by ID and preserve a unique o
   assert.equal(f.selectors.findOutcomeSpec(f.root, f.record), f.specPath);
 });
 
+test("the card describes the Outcome in force when a revised agent has several, whatever their dates and names", async (t) => {
+  const f = await fixture(t);
+  const outcome = (name, fm) => ({ type: "agent-outcome-spec", path: path.join(f.memoryRoot, "contracts", name), fm });
+  const pick = (...artifacts) => f.selectors.findOutcomeSpec(f.root, { artifacts });
+  const first = outcome("2026-11-15-agent-outcome-spec.md", { status: "approved" });
+  const relative = path.relative(f.root, first.path);
+  const second = outcome("2026-11-15-agent-outcome-spec-2.md", { status: "approved", supersedes: [relative] });
+  // Both approved while the revision is being built: the successor is the document in force for planning.
+  assert.equal(pick(first, second), second.path);
+  assert.equal(pick(second, first), second.path);
+  // After the revision was applied the earlier one is superseded, even when the catalog lists it first.
+  const retired = { ...first, fm: { status: "superseded" } };
+  assert.equal(pick(retired, second), second.path);
+  // A revision that ended without a result is withdrawn: the applied Outcome is in force again.
+  assert.equal(pick({ ...second, fm: { status: "superseded", supersedes: [relative] } }, first), first.path);
+  // One Outcome, a draft only, or none behave as before.
+  assert.equal(pick(first), first.path);
+  assert.equal(pick(outcome("draft.md", { status: "draft" })), path.join(f.memoryRoot, "contracts", "draft.md"));
+  assert.equal(pick({ type: "agent-contract", path: "/contract.md", fm: {} }), null);
+});
+
+test("a factory link that names the authored agent ID opens the same card as its catalog ID", async (t) => {
+  const f = await fixture(t);
+  // The factory first-use link is built from the Contract's agent_id, which
+  // differs from the instance-scoped catalog ID used by the Agents page.
+  assert.equal(f.record.agentId, "stable-agent");
+  assert.notEqual(f.record.id, f.record.agentId);
+  const identity = { agentId: f.record.agentId, status: "identified", routeAliases: f.record.routeAliases };
+  const agent = { id: f.record.id, identity, name: f.record.name };
+  const other = { id: "agent-other", identity: { agentId: "other-agent", status: "identified", routeAliases: [] }, name: "Other" };
+  assert.equal(f.selectors.selectAgent([other, agent], f.record.agentId), agent);
+  assert.equal(f.selectors.selectAgent([other, agent], f.record.id), agent);
+  // An exact catalog ID always wins over another agent's authored ID.
+  const shadow = { id: f.record.agentId, identity: { agentId: null, status: "legacy", routeAliases: [] }, name: "Shadow" };
+  assert.equal(f.selectors.selectAgent([agent, shadow], f.record.agentId), shadow);
+  // Ambiguous or conflicting identities never resolve to a card.
+  assert.equal(f.selectors.selectAgent([agent, { ...agent, id: "duplicate" }], f.record.agentId), null);
+  assert.equal(f.selectors.selectAgent([{ ...agent, identity: { ...identity, status: "conflict" } }], f.record.agentId), null);
+  assert.equal(f.selectors.selectAgent([agent], "missing-agent"), null);
+});
+
 test("live delivery projection requires exact project, contract, spec locks and host approval receipt", async (t) => {
   const f = await fixture(t);
   assert.equal(f.plan.agent_id, undefined, "v1 compiled plans retain their existing wire shape");

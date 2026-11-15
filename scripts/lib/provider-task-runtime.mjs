@@ -22,6 +22,16 @@ const validClient=value=>typeof value==='string' && /^[A-Za-z0-9_-]{8,128}$/.tes
 const activeStates=['dispatching','running','unknown'];
 const waitingStates=['queued','dispatching','unknown','blocked'];
 const safeCode=error=>/^[a-z][a-z0-9_]{0,79}$/.test(error?.code || '') ? error.code : 'provider_runtime_failed';
+// Public model identifiers only; anything else a provider sends is dropped.
+const publicModelId=value=>typeof value==='string' && /^[A-Za-z0-9][A-Za-z0-9._:\/+\-]{0,199}$/.test(value)?value:null;
+/** Name the identity the provider answered with, so the operator can see
+ * whether it is another model or only another spelling of the selected one. */
+function identityMismatchMessage(diagnostic){
+  const returned=publicModelId(diagnostic?.returned),requested=publicModelId(diagnostic?.requested);
+  return 'NeuralDeep returned a different model identity from the selected model'+(returned?': it answered as '+returned+(requested?' for '+requested:''):'')
+    +'. The response was stopped. Pritha preserved the attempt; retry this chat or select a model in a new chat.';
+}
+
 export class ProviderTaskError extends Error { constructor(code,message='The provider task could not be completed safely.',status=409){super(message);this.code=code;this.status=status;this.retryable=false;} }
 const failure=(code,message,status)=>new ProviderTaskError(code,message,status);
 const queueKey=(chat,client)=>'provider-queued:'+chat+':'+client;
@@ -323,7 +333,8 @@ export class ProviderTaskRuntime {
             if(observed)for(const field of Object.keys(total))total[field]+=Number.isSafeInteger(event.usage?.[field])?event.usage[field]:0;
             this.execution.updateIntent(active.key,{providerRequests:count,providerUsage:total,providerUsageKnown:row.providerUsageKnown!==false && Boolean(observed),
               lastProviderRequest:{status:event.status,upstreamAttempted:event.upstreamAttempted===true,durationMs:event.durationMs,errorCode:event.error?.code || null,
-                emptyOutputRetrySafe:event.responseSummary?.emptyOutputRetrySafe===true,rejectedToolRetrySafe:event.responseSummary?.rejectedToolRetrySafe===true,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{})}});
+                emptyOutputRetrySafe:event.responseSummary?.emptyOutputRetrySafe===true,rejectedToolRetrySafe:event.responseSummary?.rejectedToolRetrySafe===true,...(event.toolDiagnostic?{toolDiagnostic:event.toolDiagnostic}:{}),
+                ...(event.modelDiagnostic?{modelDiagnostic:{requested:publicModelId(event.modelDiagnostic.requested),returned:publicModelId(event.modelDiagnostic.returned)}}:{})}});
           }
           this.options.onProviderRequest?.(binding,active,event);
         },
@@ -414,7 +425,7 @@ export class ProviderTaskRuntime {
         +(code==='neuraldeep_empty_response' && this.execution.getIntent(active.key).providerRecoveries?.length===2?'Two automatic continuations also returned empty output. ':'')
         +'Pritha preserved this chat and its completed steps. Continue here to retry, or choose a stronger model for a new agent.',
     };
-    const error=status==='failed'?{code,message:exited?(factoryMessages[code] || (code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':code==='neuraldeep_model_identity_mismatch'?'NeuralDeep returned a different model identity from the selected model. The response was stopped. Pritha preserved the attempt; retry this chat or select a model in a new chat.':'The provider task stopped with an error. Its history has been saved.')):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
+    const error=status==='failed'?{code,message:exited?(factoryMessages[code] || (code==='provider_native_login_required'?'Claude Code needs you to sign in again. Open Settings → Providers → Claude Code → Local CLI session, complete sign-in, then continue this chat.':code==='neuraldeep_model_identity_mismatch'?identityMismatchMessage(this.execution.getIntent(active.key).lastProviderRequest?.modelDiagnostic):'The provider task stopped with an error. Its history has been saved.')):'Process exit is unconfirmed. This workspace remains reserved; the request will not repeat automatically.'}:null;
     const binding=this.require(active.chat);
     const factory=status==='completed' && binding.workspace.factorySlug
       ? factoryDraftReceipt({root:this.root,stateRoot:this.stateRoot,agentParent:this.options.agentParent,slug:binding.workspace.factorySlug,chatId:binding.chatId,connectorId:this.connectorId}) : undefined;

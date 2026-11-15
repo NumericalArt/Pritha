@@ -20,6 +20,8 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
   const directUrl = agent.url.tailscale || agent.url.local;
   const canOpenDirect = agent.ui.activity === "active" && Boolean(directUrl);
   const noRuntimeRequired = agent.readiness.runtime.status === "not_applicable";
+  // Stopped is the ordinary resting state of a service started from its card.
+  const stopped = agent.readiness.status === "stopped";
   const result = agent.resultReadiness;
   const deliveryDetail = agent.lifecycle.delivery.runId
     ? `run ${agent.lifecycle.delivery.runId}${agent.lifecycle.delivery.phase ? ` · ${agent.lifecycle.delivery.phase}` : ""}`
@@ -36,7 +38,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
       ["Build candidate", result.candidate.status, `${result.candidate.head?.slice(0, 12) || "Revision unavailable"} · ${result.candidate.reason}`],
     ] : []),
     ...(agent.lifecycle.delivery.budget ? [["Build budget", agent.lifecycle.delivery.budget.usageStatus, deliveryBudgetText(agent.lifecycle.delivery.budget)]] : []),
-    ["Health", agent.health.status, agent.health.checkedUrl || agent.health.detail || "not checked"],
+    ["Health", stopped ? "not running" : agent.health.status, stopped ? "The process is stopped; health is checked again after Start." : agent.health.checkedUrl || agent.health.detail || "not checked"],
     ["Readiness", agent.readiness.status, agent.readiness.summary],
     ["Runtime service", agent.readiness.runtime.status, agent.readiness.runtime.detail],
     ["Access", agent.readiness.access.tailscale, agent.readiness.access.detail],
@@ -56,7 +58,7 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
       <section className="agent-status-hero">
         <div>
           <span className={`status-pill ${agent.ui.activity === "active" ? "alive" : "unknown"}`}>
-            {noRuntimeRequired ? "On demand" : statusText(agent.ui.activity)}
+            {noRuntimeRequired ? "On demand" : stopped ? "stopped" : statusText(agent.ui.activity)}
           </span>
           <h1>{agent.name}</h1>
           <p>{agent.mission}</p>
@@ -78,12 +80,14 @@ export default async function AgentStatusPage({ params }: { params: Promise<{ id
         ))}
       </section>
       <section className="agent-status-note">
-        <h2>{noRuntimeRequired ? "No persistent service required" : canOpenDirect ? "Runtime available" : "Runtime not open"}</h2>
+        <h2>{noRuntimeRequired ? "No persistent service required" : canOpenDirect ? "Runtime available" : stopped ? "Agent stopped" : "Runtime not open"}</h2>
         <p>
           {noRuntimeRequired
             ? "This result is used on demand. Its approved Trials and user acceptance are shown separately above; a running process or URL is not required by this contract."
             : canOpenDirect
             ? "The agent has an active local runtime. Use the runtime link for the agent surface, or return to Child Agents for Start/Stop controls."
+            : stopped
+            ? "The agent is not running, which is its normal state after Stop. Start it from Try this agent above or from its card in Child Agents."
             : "The agent has a Control Center record, but its runtime is not currently answering as an active service. Use Child Agents to run Start, Check, or remediation before opening the runtime URL."}
         </p>
       </section>

@@ -17,6 +17,11 @@ test('Voice and Task Chat cannot turn the end of a controller reply into a compl
  const blocked=factoryMilestone({}, {status:'blocked',blockers:[{code:'iteration_budget_exhausted',title:'Build attempts exhausted',question:'Continue?'}]},null);
  assert.match(blocked.summary,/attempts/);assert.equal(factoryVoiceDisplay('complete',true,blocked).status,'waiting_for_operator');assert.ok(factoryVoiceDisplay('complete',true,blocked).ceiling<100);
  assert.equal(factoryVoiceDisplay('aborted',true,blocked).complete,true);
+ // Before the first saved step the workflow is unknown: a model-led request has
+ // no document reviews, so only a started reviewed draft announces them.
+ const notStarted=factoryMilestone(null,null,null);
+ assert.equal(notStarted.kind,'proposal');assert.equal(notStarted.label,'Clarifying the task');assert.doesNotMatch(notStarted.summary,/review/i);
+ assert.match(factoryMilestone({phase:'contract-draft'},null,null).summary,/in separate reviews/);
  // Both older accepted pilots still have this pre-acceptance factory phase.
  const accepted=factoryMilestone({phase:'awaiting-manual-acceptance'},{status:'accepted',acceptance:'accepted',blockers:[]},{commit:'tested'});
  assert.equal(factoryVoiceDisplay('complete',true,accepted).complete,true);
@@ -33,6 +38,25 @@ test('planner stops at authority and uncertainty boundaries without an effect',(
  assert.equal(plan({runId:'bound',hostVerifiedIteration:1},ledger).kind,'wait');
  assert.notEqual(factoryOperationId({...s,chatId:'a'},'deliver'),factoryOperationId({...s,chatId:'b'},'deliver'));
 });
+test('an interrupted build resumes its own run from the ledger; a failed step is still inspected',()=>{
+ const s={phase:'scaffolded',scaffoldRevision:'baseline',contract:'c',contractApproval:{sha256:'c'},outcome:'o',outcomeApproval:{sha256:'o'},continuationPause:'deliver',interruptedStep:{action:'deliver'},runId:'bound'};
+ const ledger={run_id:'bound',status:'building',iteration:1,blockers:[],budget:{legacy_usage_unverified:false,tokens_used:10,max_tokens:20,unaccounted_attempts:[{executor_result:'executor/iteration-001.json',reason:'usage_unavailable'}]}};
+ // The saved attempt is reconciled inside the resumed run, so unknown usage does not stop the resume itself.
+ assert.deepEqual(nextFactoryAction(s,ledger),{kind:'step',action:'delivery_resume'});
+ assert.deepEqual(nextFactoryAction(s,{...ledger,status:'blocked',blockers:[{code:'goal_usage_unavailable',options:[]}]}),{kind:'wait',reason:'delivery_decision'},'unmeasured usage of a finished attempt is settled by the user');
+ assert.deepEqual(nextFactoryAction(s,{...ledger,status:'blocked',blockers:[{code:'verifier_modified',options:[]}],budget:{...ledger.budget,unaccounted_attempts:[]}}),{kind:'wait',reason:'delivery_decision'});
+ const settled={...ledger,status:'verified',budget:{...ledger.budget,unaccounted_attempts:[]}};
+ assert.deepEqual(nextFactoryAction(s,settled),{kind:'step',action:'delivery_status'},'the session first reads a run that settled without it');
+ assert.deepEqual(nextFactoryAction({...s,phase:'delivery-verified'},settled),{kind:'step',action:'finish'});
+ assert.deepEqual(nextFactoryAction(s,{...ledger,run_id:'foreign'}),{kind:'wait',reason:'reconcile'});
+ const {runId,...unstarted}=s;assert.deepEqual(nextFactoryAction(unstarted,null),{kind:'step',action:'deliver'});
+ // Without the host's interruption record the same pause is a failed step.
+ for(const patch of [{interruptedStep:undefined},{interruptedStep:{action:'verify'}},{continuationPause:'scaffold',interruptedStep:{action:'scaffold'}}])
+  assert.deepEqual(nextFactoryAction({...s,...patch},ledger),{kind:'wait',reason:'inspect_step'});
+ assert.equal(factoryMilestone(s,deliveryExplanation(ledger),null).label,'Build paused');
+ assert.equal(factoryVoiceDisplay('complete',true,factoryMilestone(s,deliveryExplanation(ledger),null)).status,'waiting_for_operator');
+ assert.equal(factoryMilestone({...s,interruptedStep:undefined},deliveryExplanation(ledger),null).label,'Step paused');
+});
 test('expected implementation, repair, and a real interruption stay distinct without changing execution state',()=>{
  const state={phase:'scaffolded',scaffoldRevision:'baseline',outcomeApproval:{},running:{action:'deliver'}};
  const ledger={status:'building',phase:'implementation',iteration:1,version:1,blockers:[],budget:{tokens_used:0,max_tokens:100,max_iterations:2,legacy_usage_unverified:false,unaccounted_attempts:[]}};
@@ -44,6 +68,12 @@ test('expected implementation, repair, and a real interruption stay distinct wit
  assert.match(show(state,{...ledger,status:'verifying'}).summary,/Checking the agent behavior/);
  assert.match(show(state,{...ledger,phase:'repair',failure_history:[{trial_ids:['build-executor']}]}).summary,/builder call.*checking the saved files/);
  assert.equal(show({...state,running:null}).kind,'reconcile');
+ // The same saved marker without a turn that could own it is a stopped build, not progress.
+ const idle=(s=state,l=ledger)=>factoryMilestone(s,deliveryExplanation(l),null,{turnActive:false});
+ assert.deepEqual([idle().kind,idle().label],['stopped','Build paused']);assert.match(idle().summary,/Send a message in this chat to continue/);
+ assert.equal(factoryVoiceDisplay('complete',true,idle()).status,'waiting_for_operator');
+ assert.equal(factoryMilestone(state,deliveryExplanation(ledger),null,{turnActive:true}).label,'Implementing');
+ assert.equal(idle({...state,running:{action:'scaffold'}},{...ledger,status:'created'}).label,'Step not confirmed');
  assert.match(show(state,{...ledger,status:'cancelled'}).summary,/ended without acceptance.*New work/);
  assert.match(show(state,{...ledger,status:'paused'}).summary,/waiting for a request to continue/);
  const blocked={...ledger,status:'blocked',blockers:[{code:'build_runtime_unavailable',summary:'secret-provider-log',options:[{id:'retry-after-upgrade'}]}]};

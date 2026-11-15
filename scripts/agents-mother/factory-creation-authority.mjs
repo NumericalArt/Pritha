@@ -38,8 +38,13 @@ export function verifyCreationAuthority(authority,contract,specPath,options={}){
     if(stat.nlink!==1 || fs.realpathSync(file)!==file)return false;
     const state=JSON.parse(readBoundedRegularFile(file,{allowedRoots:[directory],maxBytes:100000}).text);
     const same=(a,b)=>JSON.stringify(Object.entries(a).sort())===JSON.stringify(Object.entries(b).sort());
+    // While a built agent is being revised the session binds two Outcomes of
+    // this Contract: the revision it is preparing and the applied one that
+    // stays in use until the revision replaces it. Both were decided under
+    // this request; no other document gains authority from it.
+    const spec=path.resolve(specPath);
     return hasCreationAuthority(state) && same(authority,state.creationAuthority)
-      && state.contract===contract.fullPath && state.outcome===path.resolve(specPath)
+      && state.contract===contract.fullPath && (state.outcome===spec || state.improvement?.applied?.outcome===spec)
       && state.target===path.resolve(options.root,contract.targetFolder);
   }catch{return false;}
 }

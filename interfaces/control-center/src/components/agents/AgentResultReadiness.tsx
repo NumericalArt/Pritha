@@ -19,6 +19,7 @@ export function AgentResultReadiness({ agent }: { agent: AgentCardModel }) {
   if (!result) return null;
   const checked = result.verification;
   const runtime = agent.runtimeReadiness?.status === "not_applicable" ? "Not required"
+    : agent.readinessStatus === "stopped" ? "Stopped"
     : agent.healthStatus === "ok" ? "Health responds" : agent.healthStatus === "failed" ? "Health does not respond" : "Not confirmed";
   return <details className="agent-result-readiness" data-testid="agent-result-readiness">
     <summary>Result: {resultLabels[checked.status]}</summary>
@@ -30,7 +31,9 @@ export function AgentResultReadiness({ agent }: { agent: AgentCardModel }) {
       <dt>Process</dt><dd>{runtime}</dd>
       <dt>Action</dt><dd>{getCardActionLabel(agent)}{agent.control?.executionMode === "plan_only" ? " · plan" : ""}</dd>
       {result.candidate.head && (result.candidate.head !== checked.head || result.candidate.status !== checked.status) ? <><dt>Build branch</dt><dd>{resultLabels[result.candidate.status]} · {result.candidate.head.slice(0, 12)}</dd></> : null}
+      {result.pending ? <><dt>New version</dt><dd>{result.pending.run ? `Build ${result.pending.run.id} · ${result.pending.run.status.replaceAll("_", " ")}` : "Being prepared"}</dd></> : null}
     </dl>
+    {result.pending ? <p>A revision of this agent is in progress. This card shows and serves the applied version until the revision is checked.</p> : null}
     {checked.reason === "outcome-approval-not-current" ? <p>Current Outcome Spec approval is required.</p> : null}
     {result.observedAt ? <p>Status as of <time dateTime={result.observedAt}>{new Date(result.observedAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC</time></p> : null}
   </details>;

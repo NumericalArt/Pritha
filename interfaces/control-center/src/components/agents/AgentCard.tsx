@@ -18,6 +18,7 @@ function stateLabel(agent: AgentCardModel) {
 
 function activityLabel(agent: AgentCardModel) {
   if (agent.runtimeReadiness?.status === "not_applicable") return "On demand";
+  if (agent.readinessStatus === "stopped") return "Stopped";
   if (agent.resultReadiness) return agent.healthStatus === "ok" ? "Health OK" : agent.healthStatus === "failed" ? "No response" : "Process not checked";
   if (agent.activity === "active") return "Active";
   if (agent.activity === "inactive") return "Inactive";

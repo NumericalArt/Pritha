@@ -6,10 +6,10 @@ import path from 'node:path';
 import {childProviderConfiguration,readChildProvider,requestChildModel} from '../scripts/lib/child-model-client.mjs';
 import {issueChildModelConnection,revokeChildModelConnection,serveChildModel} from '../scripts/lib/child-model-broker.mjs';
 
-function fixture(t,provider='openai'){
+function fixture(t,provider='openai',modelId=provider==='openai'?'gpt-4.1-mini':provider==='claude'?'claude-haiku-4-5-20251001':'qwen3.8-flash'){
   const root=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'pritha-child-broker-')));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const stateRoot=path.join(root,'state'),projectPath=path.join(root,'child');fs.mkdirSync(stateRoot);fs.mkdirSync(path.join(projectPath,'runtime'),{recursive:true});
-  const configuration=childProviderConfiguration({childModelProvider:provider,childModelId:provider==='openai'?'gpt-4.1-mini':provider==='claude'?'claude-haiku-4-5-20251001':'qwen3.8-flash',childModelConnection:'pritha',childMaxOutputTokens:256});
+  const configuration=childProviderConfiguration({childModelProvider:provider,childModelId:modelId,childModelConnection:'pritha',childMaxOutputTokens:256});
   fs.writeFileSync(path.join(projectPath,'runtime/provider.json'),JSON.stringify(configuration));
   const options={root,stateRoot,projectPath,configuration,agentId:'agent-'+'a'.repeat(24),contractHash:'b'.repeat(64),port:3420};
   const environment=issueChildModelConnection(options),token=environment.PRITHA_CHILD_MODEL_TOKEN;
@@ -32,6 +32,32 @@ for(const provider of ['openai','claude','neuraldeep'])test(provider+': child us
   assert.equal(fs.existsSync(path.join(f.projectPath,'.env.local')),false);
   const files=fs.readdirSync(path.join(f.stateRoot,'private','child-model'));
   for(const file of files){const content=fs.readFileSync(path.join(f.stateRoot,'private','child-model',file),'utf8');assert.ok(!content.includes(f.token));assert.ok(!content.includes('parent-canary'));}
+});
+test('a child pinned to a documented Claude alias reaches the provider under its exact dated model ID',async t=>{
+  // Observed 2026-11-14: a verified agent whose Contract selected
+  // claude-sonnet-4-5 failed every live request with runtime_identity_mismatch,
+  // because the provider reports claude-sonnet-4-5-20250929 for that alias.
+  const f=fixture(t,'claude','claude-sonnet-4-5'),local=readChildProvider(f.projectPath,{environment:f.environment});
+  const requested=[];let reported='claude-sonnet-4-5-20250929';
+  const upstream=async(url,options)=>{
+    const body=JSON.parse(options.body);requested.push(body.model);assert.equal(body.max_tokens,256);
+    return Response.json({id:'msg_test',model:reported,content:[{type:'text',text:'model answer'}],stop_reason:'end_turn',usage:{input_tokens:3,output_tokens:2}});
+  };
+  const viaBroker=async(url,options)=>{
+    try{return Response.json(await serveChildModel({...f,request:JSON.parse(options.body),validateGrant:()=>true,readCredential:()=> 'parent-key',fetchImpl:upstream}));}
+    catch(error){return Response.json({error:error.code},{status:503});}
+  };
+  const result=await requestChildModel(local.configuration,{messages:[{role:'user',content:'input'}]},{...local,fetchImpl:viaBroker});
+  // The provider is asked for the dated ID; the child sees the model its accepted Contract selected.
+  assert.deepEqual(requested,['claude-sonnet-4-5-20250929']);
+  assert.equal(result.model,'claude-sonnet-4-5');assert.equal(result.content[0].text,'model answer');
+  const grant=JSON.parse(fs.readFileSync(path.join(f.stateRoot,'private','child-model',f.agentId+'.json'),'utf8'));
+  assert.equal(grant.configuration.modelId,'claude-sonnet-4-5');assert.deepEqual(grant.usage,{requests:1,tokens:5,unknown:0,activeMs:grant.usage.activeMs});
+  // Canonicalization is not a relaxed identity check: any other reported model is still refused.
+  for(reported of ['claude-sonnet-4-5','claude-sonnet-5-5','claude-sonnet-4-5-20250929-preview']){
+    await assert.rejects(requestChildModel(local.configuration,{messages:[{role:'user',content:'input'}]},{...local,fetchImpl:viaBroker}),{code:'runtime_identity_mismatch'});
+  }
+  assert.equal(requested.length,4);
 });
 test('broker rejects changed authority, revoked tokens and repeated requests before another inference',async t=>{
   const f=fixture(t);let calls=0;

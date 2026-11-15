@@ -41,3 +41,33 @@ for(const [builder,provider,model] of [['codex','openai','gpt-4.1-mini'],['claud
   fs.writeFileSync(path.join(root,'scripts/server.mjs'),fixed);const rejected=run();assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/HTTP product JSON differs/);
   const fake=structuredClone(trial);delete fake.http[0].model_output;assert.throws(()=>validateProductTrial(fake,data),{code:'factory_product_trial_model_proof_required'});
 });
+
+test('every rejected product example names the violated rule and the example, without quoting its content',()=>{
+  // Observed 2026-11-14: builders repeated the same rejected examples because
+  // every rule answered with one generic sentence. Each rule now explains itself.
+  const base={text:'',coreFunctions:[],criticalWorkflows:[],agentName:'Rule fixture',runtimeFamily:'api',primaryInterface:'api',secondaryInterfaces:'none',memoryModel:'none',toolSystem:'none',skillNeeds:'none',telegramMode:'none',serviceMode:'process',proactiveMode:'none',autostart:'disabled',envExampleVariables:'FIXTURE_PORT=3041',childModelProvider:'claude',childModelId:'claude-haiku-4-5-20251001',childModelConnection:'pritha',childMaxOutputTokens:'256',outcomeApprovalPolicy:'request-delegated-local-v1'};
+  const check=(input,extra)=>({argv:['node','scripts/server.mjs'],port_variable:'FIXTURE_PORT',path:'/run',input_json:{text:input},covers:['F001'],...extra});
+  const ok=()=>({http:[check('first',{expected_json:{label:'one'},model_output:{label:'one'}}),check('',{expected_status:400,expected_json:{error:'invalid_input'}})]});
+  assert.doesNotThrow(()=>validateProductTrial(ok(),base));
+  const SECRET='do-not-echo-this-example-text';
+  const rejects=(mutate,code,detail,data=base)=>{
+    const trial=ok();mutate(trial);
+    try{validateProductTrial(trial,data);assert.fail('expected '+code);}catch(error){
+      assert.equal(error.code,code);assert.match(error.detail,detail);assert.ok(!error.detail.includes(SECRET),'detail must not quote example content');
+    }
+  };
+  rejects(t=>{t.extra=[];},'factory_product_trial_invalid',/only http, cli and host_checks/);
+  rejects(t=>{delete t.http;},'factory_product_trial_invalid',/at least one http or cli example/);
+  rejects(t=>{t.cli=[{argv:['node','scripts/agent-cli.mjs',SECRET],expected_json:{label:'one'},covers:['F001']}];},'factory_product_trial_interfaces',/declares no CLI interface\. Remove the cli examples/);
+  rejects(()=>{},'factory_product_trial_interfaces',/declares a CLI interface, so cli examples are required\. For an HTTP-only product set secondaryInterfaces=none/,{...base,secondaryInterfaces:'CLI'});
+  rejects(t=>{t.http[1].expected_status=302;},'factory_product_trial_invalid',/^http\[1\]: expected_status is 200 for success or 400–599/);
+  rejects(t=>{t.http[0].expected_json=[SECRET];},'factory_product_trial_invalid',/^http\[0\]: expected_json must be a JSON object/);
+  rejects(t=>{t.http[0].path='run '+SECRET;},'factory_product_trial_invalid',/^http\[0\]: an http example needs a path such as \/run/);
+  rejects(t=>{t.http[0].unknown=SECRET;},'factory_product_trial_invalid',/^http\[0\]: an example is an object with only its documented fields/);
+  rejects(t=>{delete t.http[0].model_output;},'factory_product_trial_model_proof_required',/^http\[0\]: a successful example of a model-connected product needs model_output/);
+  rejects(t=>{t.http.push(check('offline',{expected_status:503,model_error:'model_unavailable',expected_json:{error:SECRET}}));},'factory_product_trial_invalid',/^http\[2\]: model_error is one of provider_pending_auth, provider_unavailable, provider_rate_limited, provider_timeout/);
+  rejects(t=>{t.http[0].model_output=[SECRET];},'factory_product_trial_invalid',/^http\[0\]: model_output must be text or a JSON object/);
+  rejects(t=>{t.http.push(structuredClone(t.http[0]));},'factory_product_trial_invalid',/^http\[2\]: this request repeats an earlier example/);
+  rejects(t=>{t.http=[t.http[1]];},'factory_product_trial_variants_required',/at least one successful http example/);
+  rejects(t=>{t.http=[];},'factory_product_trial_variants_required',/between 1 and 8 http examples/);
+});

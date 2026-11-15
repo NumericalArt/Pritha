@@ -1,4 +1,4 @@
-import {deliveryUsageStatus} from './delivery-ledger.mjs';
+import {deliveryUsageStatus,RESERVED_USAGE_SOURCE} from './delivery-ledger.mjs';
 
 // Project known causes and actual paused actions, never provider prose or logs.
 const reasons = {
@@ -24,6 +24,7 @@ const choices = {
   'review-failures':['Review results','The build will remain paused.'],
   'inspect-worktree':['Inspect build files','No new attempt will start.'],
   'retry-accounting':['Reconcile usage','The host will check the executor record without resubmitting the request.'],
+  'count-reserved':['Count the reserved amount','The interrupted request is charged at the amount reserved for it, which may be more than its real cost. The build then continues within the remaining limit.'],
   'retry-after-upgrade':['Restore and retry','After recovery, Pritha will check the availability of the selected environment.'],
   'revise-contract':['Revise the Contract','Changed requirements will require a new decision.'],
   'resume-build':['Continue the build','The executor will work within the remaining limits.'],
@@ -55,6 +56,8 @@ export function deliveryExplanation(s) {
   return {status:s.status,phase:s.phase,version:s.version,iteration:s.iteration,
     lastFailureKind:s.failure_history?.at(-1)?.trial_ids?.includes('build-executor')?'executor':s.failure_history?.length?'trial':null,
     budget:{tokensUsed:s.budget.tokens_used,maxTokens:s.budget.max_tokens,maxIterations:s.budget.max_iterations,
-      usageStatus:deliveryUsageStatus(s.budget),overrun:Math.max(0,s.budget.tokens_used-s.budget.max_tokens)},
+      usageStatus:deliveryUsageStatus(s.budget),overrun:Math.max(0,s.budget.tokens_used-s.budget.max_tokens),
+      // The total stays honest about its parts: some of it is a reservation, not a measurement.
+      ...((s.budget.accounted_turns || []).some(turn=>turn?.usage_source===RESERVED_USAGE_SOURCE)?{reservedUsage:true}:{})},
     acceptance:s.accepted_by==='user'?'accepted':'pending',blockers};
 }

@@ -3,7 +3,7 @@ id: agents-mother
 type: workflow
 status: experimental
 created: 2026-05-18
-updated: 2026-11-13
+updated: 2026-11-15
 topics:
   - agent-engineering
   - agent-factory
@@ -949,6 +949,27 @@ scaffold, product Trials, builder repair and verified local application.
 interrupted preparation turn. Accepted documents, measured usage, Stop and
 decline retain their ordinary boundaries. It cannot turn an unknown execution
 into a safe retry or extend an approved budget.
+
+Stop, a timeout or a host restart can end a build step before its worker writes
+a receipt. The next message in that chat lets `factory_continue` release the
+step once the earlier process has provably exited, and the same delivery run
+resumes from its ledger; no second build starts. If the stopped request never
+reported its usage, it is charged at the amount the host reserved for it. A
+build that Pritha leads herself does this without a separate answer (user
+decision of 2026-11-15); a reviewed or custom build pauses and offers it as
+`count-reserved`, which needs the user's approval. Document, research and scaffold steps are
+not released this way.
+
+After the build, `factory_improve` changes how the agent behaves until the user
+accepts it. It takes the complete revised product examples and a short note;
+the accepted Contract, and with it the name, interfaces, port, model connection
+and limits, stays as it is. The host prepares a successor Outcome and its
+verifier, builds in a separate worktree on top of the applied version and
+fast-forwards the project only when the revised Trials pass. Until then the
+card shows and serves the applied version and names the pending build. A
+running agent is stopped by the user before the revision is applied; `finish`
+then applies it without a rebuild. See the 2026-11-14 and 2026-11-15 sections of
+`05_decisions/2026-11-13-model-led-local-agent-creation.md`.
 
 This route supports deterministic API children and Pritha-connected LLM children
 with no repository adoption or autostart. Existing factories and custom runtimes

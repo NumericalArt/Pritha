@@ -24,6 +24,7 @@ export type AgentCardModel = {
   agentKind?: ControlCenterAgent["agentKind"];
   resultReadiness?: ControlCenterAgent["resultReadiness"];
   runtimeReadiness?: ControlCenterAgent["readiness"]["runtime"];
+  readinessStatus?: ControlCenterAgent["readiness"]["status"];
   healthStatus?: ControlCenterAgent["health"]["status"];
   restorePlanStatus?: "ready" | "unavailable" | "planned";
   rollbackStatus?: "ready" | "unavailable" | "planned";

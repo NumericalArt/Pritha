@@ -1,6 +1,7 @@
 import {hasCreationAuthority,hasDelegatedContract} from './factory-creation-authority.mjs';
 import {verifiedFirstUse} from './factory-first-use.mjs';
 import {applyVerifiedFactoryResult} from './factory-application.mjs';
+import {improving,improvementAvailability,improvementGuidance} from './factory-improvement.mjs';
 import {FactoryBudget} from './factory-budget.mjs';
 import {deliveryBudgetExtensionAllowed} from './delivery-ledger.mjs';
 import {localApiResearchSources,researchPage,supportsLocalApiContinuation} from './factory-continuation.mjs';
@@ -78,7 +79,7 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
   const {contractData,validateContract}=await import('./contract.mjs');
   const {interview,researchContract,externalResearchContract:researchFromHost}=await import('./index.mjs');
   const externalResearchContract=dependencies.externalResearchContract || researchFromHost;
-  const {createOutcomeSpec,approveOutcomeSpec,outcomeSpecFile,verifyOutcomeApproval}=await import('./outcome-spec.mjs');
+  const {createOutcomeSpec,approveOutcomeSpec,outcomeSpecFile,verifyOutcomeApproval,retireOutcomeSpec}=await import('./outcome-spec.mjs');
   const {planScaffoldContract,scaffoldContract}=await import('./scaffold/index.mjs');
   const delivery=dependencies.delivery || await import('./delivery-loop.mjs');
   const options={root:p.root,stateRoot:p.stateRoot};
@@ -188,7 +189,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     }
     case 'create_outcome':{
       requireFactoryApprovals(p,state,{outcome:false});contract();if(state.outcome)throw factoryFail('factory_artifact_exists');
-      state.outcome=createOutcomeSpec(state.contract,options).path;state.phase='outcome-draft';value={artifact:'outcome',sha256:factoryArtifact(p,state,'outcome').sha256};break;
+      // A revision of a built agent names the approved Outcome it is meant to replace and keeps its own verifier files.
+      state.outcome=createOutcomeSpec(state.contract,improving(state)?{...options,supersedes:state.improvement.applied.outcome,factoryOutcomeRevision:state.improvement.number}:options).path;
+      state.phase='outcome-draft';value={artifact:'outcome',sha256:factoryArtifact(p,state,'outcome').sha256};break;
     }
     case 'prepare_product_trial':{
       requireFactoryApprovals(p,state,{outcome:false});const data=contract(),row=factoryArtifact(p,state,'outcome');
@@ -202,9 +205,36 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       if(row.frontmatter.status!=='draft' || row.sha256!==input.expected_sha256)throw factoryFail('factory_draft_changed');
       const checked=outcomeSpecFile(state.outcome,options),blocking=checked.issues.filter(issue=>!['OS015','OS016'].includes(issue.code));if(blocking.length)throw validationFailure(blocking);
       reviewProductTrials(p,row,contract());
-      const inputRoot=factoryTrialInputRoot(p,contract());
+      const inputRoot=factoryTrialInputRoot(p,contract(),row);
       const delegated=hasCreationAuthority(state) && supportsLocalApiContinuation(contract());
-      approveOutcomeSpec(state.outcome,{...options,approvedBy:delegated?'pritha':'user',...(delegated?{creationAuthority:state.creationAuthority}:{}),projectPath:fs.existsSync(p.target)?p.target:inputRoot});state.outcomeApproval={approvedBy:delegated?'pritha':'user',...(delegated?{authorization:state.creationAuthority}:{}),sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};state.phase='outcome-approved';value={approved:'outcome',next:'research'};break;
+      // The project of an agent being revised still holds the applied version and its verifier: the revised
+      // files are checked where the host prepared them and reach the project only with the verified build.
+      approveOutcomeSpec(state.outcome,{...options,approvedBy:delegated?'pritha':'user',...(delegated?{creationAuthority:state.creationAuthority}:{}),projectPath:fs.existsSync(p.target) && !improving(state)?p.target:inputRoot});state.outcomeApproval={approvedBy:delegated?'pritha':'user',...(delegated?{authorization:state.creationAuthority}:{}),sha256:factoryArtifact(p,state,'outcome').sha256,reviewedSha256:row.sha256,operationId:input.operation_id,approvedAt:new Date().toISOString()};
+      // The project of a revision already exists, so its build follows directly; research and scaffold belong to creation.
+      state.phase=improving(state)?'scaffolded':'outcome-approved';value={approved:'outcome',next:improving(state)?'deliver':'research'};break;
+    }
+    case 'improve':{
+      approved();const data=contract();
+      // Inside the worker the session names this very step as running; the rule concerns an earlier unconfirmed one.
+      const availability=improvementAvailability({...state,running:null},observeDelivery().state);
+      if(!availability.available || !supportsLocalApiContinuation(data))throw Object.assign(factoryFail('factory_improvement_unavailable'),{reason:availability.reason || 'custom_workflow'});
+      validateProductProposal(input.product,data.coreFunctions || []);compileProductProposal(input.product,data);
+      // The version in the project stays the reference: a second revision after one that ended still replaces that version.
+      const applied=improving(state)?state.improvement.applied:{outcome:state.outcome,outcomeApproval:state.outcomeApproval,runId:state.runId,localApplication:state.localApplication,
+        preparation:state.preparation,phase:state.phase,...(state.hostVerifiedIteration!==undefined?{hostVerifiedIteration:state.hostVerifiedIteration}:{})};
+      if(factoryHash(input.product)===applied.preparation.productHash)throw factoryFail('factory_improvement_unchanged');
+      const note=typeof input.note==='string'?input.note.trim():'';
+      if(input.note!==undefined && typeof input.note!=='string' || note.length>2000)throw factoryFail('factory_input_invalid');
+      if(note)checkDraftSafety(note,'research');
+      const now=new Date().toISOString();
+      atomicWriteFile(path.join(p.directory,'improvement-history',input.operation_id+'.json'),JSON.stringify({version:1,reason:'improvement-started',actor:'pritha',recordedAt:now,state}));
+      // An earlier revision that ended without a verified result leaves the lineage; the applied Outcome stays approved.
+      if(improving(state))retireOutcomeSpec(factoryArtifact(p,state,'outcome').file,options);
+      state.improvement={number:(state.improvement?.number || 0)+1,operationId:input.operation_id,startedAt:now,...(note?{note}:{}),applied};
+      state.preparation={...applied.preparation,product:input.product,productHash:factoryHash(input.product),preparedOutcomeSha256:null};
+      for(const key of ['outcome','outcomeApproval','runId','localApplication','hostVerifiedIteration','continuationPause','interruptedStep'])delete state[key];
+      state.phase='contract-approved';
+      value={improvement:state.improvement.number,next:'The host prepares the revised Outcome and its verifier, then builds on the applied version. That version stays in the project and in use until the revision is verified.'};break;
     }
     case 'research':{
       approved();if(state.research || state.pattern)throw factoryFail('factory_research_already_started');const result=await researchContract(state.contract,{'github-mode':hasDelegatedContract(state) || request.connectorId==='local'?'registry-only':'auto'});
@@ -274,7 +304,9 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       approved();
       const buildModel=state.buildConfiguration?.modelId || request.model;
       const buildEffort=state.buildConfiguration?.effort ?? inheritedFactoryBuildEffort(request.connectorId,buildModel,request.effort);
-      const buildOptions={...options,buildExecutor:executor,buildExecutorOptions:{model:buildModel,effort:buildEffort,preset:request.preset,factoryParent:request.factoryParent,
+      // A revision installs its reviewed verifier in the build worktree, never in the project, and tells the builder what it is revising.
+      const revision=improving(state)?{preparedTrialInputRoot:factoryTrialInputRoot(p,contract(),factoryArtifact(p,state,'outcome')),guidance:improvementGuidance(state)}:{};
+      const buildOptions={...options,...revision,buildExecutor:executor,buildExecutorOptions:{model:buildModel,effort:buildEffort,preset:request.preset,factoryParent:request.factoryParent,
         factoryBudget:{...options,agentParent:p.parent,slug:p.slug,target:p.target,chatId:state.chatId,connectorId:request.connectorId}}};
       let result;
       if(input.action==='deliver'){
@@ -305,10 +337,20 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
     case 'finish':{
       approved();const result=observeDelivery();if(!['verified','awaiting_acceptance','accepted'].includes(result.state.status))throw factoryFail('factory_delivery_not_verified');
       state.localApplication=applyVerifiedFactoryResult(p,state,result);
+      if(improving(state) && state.localApplication?.status==='applied'){
+        // The revision is the version in the project now; the Outcome it replaced leaves use.
+        const {applied,...revision}=state.improvement;
+        // Both paths are read back through the session's artifact boundary before either document is touched.
+        retireOutcomeSpec(factoryArtifact(p,{outcome:applied.outcome},'outcome').file,{...options,supersededBy:factoryArtifact(p,state,'outcome').file});
+        state.improvement={...revision,appliedAt:new Date().toISOString(),replaced:{outcome:applied.outcome,runId:applied.runId}};
+      }
       const {rebuildRegistry}=dependencies.registry || await import('./registry.mjs');const {checkCardReadiness}=dependencies.cards || await import('./card-readiness.mjs');rebuildRegistry();
       const card=await checkCardReadiness(state.agentId,{...options,baseUrl:false});
       const accepted=result.state.status==='accepted';
-      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,next:card.status!=='ready'?'Complete local application or resolve the reported card configuration blockers.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready'?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
+      // A verified revision that could not be applied yet (the agent is running, or the project changed) is not
+      // the version in use: the card still serves the applied one, so the handoff is not complete.
+      const unapplied=improving(state);
+      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,...(state.improvement?{improvement:{number:state.improvement.number,applied:!unapplied}}:{}),next:unapplied?'The revision is verified but not applied: '+(state.localApplication?.reason==='service_record_present'?'the agent is running its applied version. Ask the user to stop it from its card, then call finish again.':'resolve the reported application condition, then call finish again.')+' The applied version is unchanged.':card.status!=='ready'?'Complete local application or resolve the reported card configuration blockers.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready' && !unapplied?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }
@@ -326,7 +368,9 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   }catch(error){
     if(request?.resultFile){
       let state=request.state;try{state=loadVoiceFactory(voiceFactoryPaths(request),request) || state;}catch{/* preserve original binding */}
-      atomicWriteFile(request.resultFile,JSON.stringify({version:1,operationId:request.input.operation_id,ok:false,state,value:{error:/^[a-z_]{1,80}$/.test(error.code || '')?error.code:'factory_step_failed'},diagnostic:redactSensitiveText(String(error.message)).slice(0,5000)}));
+      // A product Trial rule carries a host-authored sentence naming what to correct.
+      const rule=/^factory_product_trial_[a-z_]+$/.test(error.code || '') && typeof error.detail==='string'?' '+error.detail:'';
+      atomicWriteFile(request.resultFile,JSON.stringify({version:1,operationId:request.input.operation_id,ok:false,state,value:{error:/^[a-z_]{1,80}$/.test(error.code || '')?error.code:'factory_step_failed'},diagnostic:redactSensitiveText(String(error.message)+rule).slice(0,5000)}));
     }
     process.exitCode=1;
   }

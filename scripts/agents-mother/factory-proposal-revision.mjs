@@ -57,10 +57,16 @@ export function saveProposalRevision(paths,state,input,data){
 
 // Each revised proposal gets independent verifier files. Previously approved
 // Outcomes and their protected input bytes remain valid historical evidence.
-export function factoryTrialInputRoot(paths,data){
+export function factoryTrialInputRoot(paths,data,outcome){
+  const number=raw=>{
+    const revision=Number(raw);
+    if(!/^[1-9][0-9]*$/.test(String(raw)) || !Number.isSafeInteger(revision))throw factoryFail('factory_proposal_changed');
+    return revision;
+  };
   const raw=data?.fm?.factory_proposal_revision;
-  if(raw===undefined)return path.join(paths.directory,'trial-inputs');
-  const revision=Number(raw);
-  if(!/^[1-9][0-9]*$/.test(String(raw)) || !Number.isSafeInteger(revision))throw factoryFail('factory_proposal_changed');
-  return path.join(paths.directory,'proposal-'+revision,'trial-inputs');
+  const base=raw===undefined?paths.directory:path.join(paths.directory,'proposal-'+number(raw));
+  // A revised Outcome of the same Contract (a built agent being improved) has
+  // its own verifier files as well; the applied version keeps reading its own.
+  const improved=outcome?.frontmatter?.factory_outcome_revision;
+  return improved===undefined?path.join(base,'trial-inputs'):path.join(base,'outcome-'+number(improved),'trial-inputs');
 }

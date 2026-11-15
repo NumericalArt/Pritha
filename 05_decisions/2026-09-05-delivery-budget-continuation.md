@@ -3,7 +3,7 @@ id: 2026-09-05-delivery-budget-continuation
 type: decision
 status: implementation-selected
 created: 2026-09-05
-updated: 2026-09-05
+updated: 2026-11-15
 topics: [agents-mother, delivery-continuation, goal-budget, host-verification, control-center]
 tools: [Pritha, Codex App Server, Node.js, Next.js]
 sources:
@@ -129,3 +129,16 @@ Native Goal RPC не предоставляет compare-and-set по revision. L
 и [описанием Goals](https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex).
 Дата обновления документации не указана; вывод привязан к установленным
 версиям и протокольным проверкам в implementation review.
+
+## Update 2026-11-15: unmeasured request in a model-led build
+
+A request that is cut off before the provider reports usage can never be
+measured afterwards, so the recovery described above could not end the pause.
+For a build that Pritha leads herself, the user decided that an attempt which
+has provably ended is counted at the amount the host reserved for it and the
+same run continues. The amount can only overstate the real charge, and the
+receipt, the ledger and the build status say that it is a reservation. All
+other builds keep the rule above and offer the same step as an explicit user
+decision. Details:
+`05_decisions/2026-11-13-model-led-local-agent-creation.md`, section
+"Interruption and status corrections".

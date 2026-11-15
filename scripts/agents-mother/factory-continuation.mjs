@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {deliveryUsageStatus} from './delivery-ledger.mjs';
 import {scaffoldCapability} from './scaffold/capabilities.mjs';
 import {childProviderConfiguration} from '../lib/child-provider-configuration.mjs';
+import {buildInterrupted} from './factory-interruption.mjs';
 
 // Start from an official page with relevant, readable passages. HostResearch
 // still checks each redirect, source authority, freshness and selected quote.
@@ -37,19 +38,27 @@ export function supportsLocalApiContinuation(contract) {
     && scaffoldCapability(contract).adapter === 'api-process-v1';
 }
 
+const RESUMABLE_RUN_STATUSES=new Set(['created','preparing','building','verifying','correcting','paused']);
+
 // A plan is not authority. The tool host checks the lease, approvals, locks
 // and current revision again when it claims each ordinary worker operation.
 export function nextFactoryAction(s,ledger) {
   const wait=(reason)=>({kind:'wait',reason}), step=action=>({kind:'step',action});
   if(!s?.contract)return wait('brief');
   if(s.running)return wait('reconcile');
-  if(s.continuationPause)return wait('inspect_step');
+  // A step that failed is inspected. An interrupted build is different: its
+  // run resumes below from the ledger, which first reconciles the saved attempt.
+  const interrupted=buildInterrupted(s);
+  if(s.continuationPause && !interrupted)return wait('inspect_step');
   if(!s.contractApproval)return wait('contract_decision');
   if(!s.outcome)return s.phase==='contract-approved'?step('create_outcome'):wait('reconcile');
   if(!s.outcomeApproval)return wait('outcome_decision');
   if(s.runId){
     if(!ledger || ledger.run_id!==s.runId)return wait('reconcile');
-    if(deliveryUsageStatus(ledger.budget)!=='complete')return wait('reconcile');
+    if(interrupted && RESUMABLE_RUN_STATUSES.has(ledger.status))return step('delivery_resume');
+    // The run settled without the session hearing about it: read it once.
+    if(interrupted && ledger.status!=='blocked' && s.phase!=='delivery-'+ledger.status)return step('delivery_status');
+    if(deliveryUsageStatus(ledger.budget)!=='complete')return wait(ledger.status==='blocked' && ledger.blockers?.[0]?.code==='goal_usage_unavailable'?'delivery_decision':'reconcile');
     if(ledger.budget.tokens_used>ledger.budget.max_tokens)return wait('budget_overrun');
     if(ledger.status==='blocked'){
       // A known, stopped builder that ran out of reservation may already have

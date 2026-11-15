@@ -732,9 +732,16 @@ export async function runChildModelRequest(token:string,request:unknown,signal?:
 async function childInteractionContext(agentId:string){
   const {status,agent}=await getControlCenterAgent(agentId);if(!agent)return null;
   const record=findCatalogAgent(readAgentCatalog({root:status.root}),agent.id);
-  const outcome=record?.artifacts.find(a=>a.type==='agent-outcome-spec' && a.fm.status==='approved');
-  if(!record?.projectPath || !outcome)return null;
-  const definition=childInteractionDefinition(record.projectPath,readCatalogArtifact(record,outcome.path,{root:status.root}));
+  // While a revision is being built, two Outcomes are approved. The form belongs to the one whose
+  // protected verifier is the file in the project, i.e. the applied version, never to the pending one.
+  const outcomes=record?.artifacts.filter(a=>a.type==='agent-outcome-spec' && a.fm.status==='approved') || [];
+  if(!record?.projectPath || !outcomes.length)return null;
+  let definition:ReturnType<typeof childInteractionDefinition>=null;
+  for(const [index,outcome] of outcomes.entries()){
+    try{definition=childInteractionDefinition(record.projectPath,readCatalogArtifact(record,outcome.path,{root:status.root}));}
+    catch(error){if((error as {code?:string})?.code!=='agent_verification_changed' || index===outcomes.length-1)throw error;continue;}
+    if(definition)break;
+  }
   if(!definition)return null;
   const model=approvedChildModel(status.root,agent.id);
   return {agent,definition,projectPath:record.projectPath,model:model?{provider:model.configuration.connectorId,model:model.configuration.modelId,connection:model.configuration.connection || 'child-owned'}:null};
@@ -752,8 +759,14 @@ export async function runAgentInteraction(agentId:string,input:unknown,signal?:A
   return requestChildProduct({projectPath:context.projectPath,upstream:context.agent.operations.localUrl,definition:context.definition,input,signal});
 }
 
-function findOutcomeSpec(_root: string, agent: RegistryRecord) {
-  return agent.artifacts.find((artifact) => artifact.type === "agent-outcome-spec")?.path || null;
+function findOutcomeSpec(root: string, agent: RegistryRecord) {
+  // A revised agent has several Outcomes, and they can carry the same date. The card
+  // describes the one in force: an approved Outcome that no other approved one replaces.
+  const outcomes = agent.artifacts.filter((artifact) => artifact.type === "agent-outcome-spec");
+  const approved = outcomes.filter((artifact) => artifact.fm?.status === "approved");
+  const replaced = new Set(approved.flatMap((artifact) => Array.isArray(artifact.fm?.supersedes)
+    ? artifact.fm.supersedes.filter((entry): entry is string => typeof entry === "string" && Boolean(entry)).map((entry) => path.resolve(root, entry)) : []));
+  return (approved.find((artifact) => !replaced.has(artifact.path)) || approved[0] || outcomes[0])?.path || null;
 }
 
 function findDeliveryReport(_root: string, agent: RegistryRecord) {
@@ -2097,9 +2110,28 @@ async function operationalReadiness(params: {
     };
   }
 
+  // A service this Control Center can start itself is simply not running
+  // between Stop and the next Start. That is its ordinary resting state, so it
+  // is not reported as a defect; only a runtime nobody here can start is blocked.
+  const implemented = manifest.outcome_status !== "implementation-required" && manifest.control_center_contract?.status !== "implementation-required";
+  if (implemented && health.status === "failed" && Boolean(manifest.control_center_managed)
+    && classifyCommandReadiness(manifest.start_command) === "structured_executable") {
+    return {
+      status: "stopped",
+      summary: "The agent is not running. Start it from its card or send a request from Try this agent.",
+      runtime,
+      access: accessReady,
+      checks,
+      blockers,
+      nextActions,
+    };
+  }
+
   return {
     status: "blocked",
-    summary: health.checkedUrl || health.detail || "Local runtime is not ready.",
+    summary: !implemented ? "The project still contains a scaffold; the verified build is not applied yet."
+      : health.status === "failed" ? `The local endpoint did not respond${health.checkedUrl ? `: ${health.checkedUrl}` : "."}`
+      : health.detail || "Local runtime is not ready.",
     runtime,
     access: accessReady,
     checks,
@@ -2362,7 +2394,7 @@ async function buildAgent(root: string, record: RegistryRecord, access: AccessLi
       primaryAction: legacyPlanAction(control),
       actionEnabled: control.executionMode === "executable",
       actionDisabledReason: control.reason,
-      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : control.runtimeKind === "scaffold" && folder ? control.reason : noRuntimeRequired ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
+      issueText: record.identityStatus === "conflict" ? "Contract and project identity need review" : control.runtimeKind === "scaffold" && folder ? control.reason : noRuntimeRequired || readiness.status === "stopped" ? undefined : readinessIssueText(readiness) || issueText(Boolean(folder), manifest, health.status),
       updateStatus: "none",
     },
     control,
@@ -2531,6 +2563,12 @@ export function controlCenterStatusForClient(status: ControlCenterStatus): Contr
 function selectAgent(agents: ControlCenterAgent[], id: string) {
   const exact = agents.find((agent) => agent.id === id);
   if (exact) return exact;
+  // Factory results, reports and contracts name an agent by its authored ID,
+  // while the catalog route uses the instance-scoped API ID. Resolve the
+  // authored ID only when exactly one agent without an identity conflict owns it.
+  const authored = agents.filter((agent) => agent.identity?.agentId === id && agent.identity.status !== "conflict");
+  if (authored.length === 1) return authored[0];
+  if (authored.length > 1) return null;
   const legacy = agents.filter((agent) => agent.identity?.routeAliases.includes(id));
   return legacy.length === 1 ? legacy[0] : null;
 }
@@ -2990,7 +3028,7 @@ function buildOperatorActionPlan(status: ControlCenterStatus, agent: ControlCent
         : [
             "Review plan, preflight checks and blockers",
             startStopEnabled && requiresConfirmation
-              ? `Enter the required confirmation phrase to ${action} the managed agent runtime`
+              ? `Confirm the ${action} action for the managed agent runtime; this page sends the plan's confirmation phrase for you`
               : startStopEnabled
                 ? `Run the ${action} action for the managed agent runtime`
                 : "Resolve blockers before execution is enabled",

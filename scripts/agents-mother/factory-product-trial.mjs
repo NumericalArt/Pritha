@@ -26,7 +26,11 @@ export const PRODUCT_HOST_CHECKS = Object.freeze({
 });
 const productCases = trial => [...(trial.http || []), ...(trial.cli || [])];
 const sha256 = content => createHash('sha256').update(content).digest('hex');
-const fail = code => { throw Object.assign(new Error('Prepare and review an independent HTTP/CLI product Trial before approving this Outcome.'), { code }); };
+// `detail` is a host-authored sentence naming the violated rule. It never
+// quotes example content, so it is safe to return to the builder model.
+const fail = (code, detail) => { throw Object.assign(new Error('Prepare and review an independent HTTP/CLI product Trial before approving this Outcome.'), detail ? { code, detail } : { code }); };
+export const PRODUCT_MODEL_ERRORS = Object.freeze(['provider_pending_auth','provider_unavailable','provider_rate_limited','provider_timeout']);
+const MODEL_ERRORS = PRODUCT_MODEL_ERRORS;
 
 export function managedStopVerifier(data) {
   const template = fs.readFileSync(new URL('./scaffold/templates/managed-stop-trial.mjs.tmpl', import.meta.url), 'utf8');
@@ -47,7 +51,7 @@ function nodeCommand(argv) {
   if (!Array.isArray(argv) || argv.length < 2 || argv.length > 24 || argv[0] !== 'node'
       || !safeTrialInputPath(argv[1]) || !argv[1].startsWith('scripts/') || !argv[1].endsWith('.mjs')
       || argv.some(value => typeof value !== 'string' || value.length > 2000 || /[\x00-\x1f]/.test(value))) {
-    fail('factory_product_trial_invalid');
+    fail('factory_product_trial_invalid', 'A command must be ["node","scripts/<file>.mjs", ...] with at most 24 plain text arguments.');
   }
 }
 
@@ -57,48 +61,66 @@ export function validateProductTrial(trial, data) {
   try {
     json = JSON.stringify(trial);
     parseBoundedJson(json, { maxBytes: 12000, maxDepth: 8, maxNodes: 500 });
-  } catch { fail('factory_product_trial_invalid'); }
-  if (!trial || Array.isArray(trial) || Object.keys(trial).some(key => !['cli', 'http', 'host_checks'].includes(key))
-      || (!trial.cli && !trial.http) || redactSensitiveText(json) !== json) fail('factory_product_trial_invalid');
+  } catch { fail('factory_product_trial_invalid', 'The product examples must be JSON of at most 12 KB, 8 nesting levels and 500 values.'); }
+  if (!trial || Array.isArray(trial) || Object.keys(trial).some(key => !['cli', 'http', 'host_checks'].includes(key))) fail('factory_product_trial_invalid', 'Product examples are an object that contains only http, cli and host_checks.');
+  if (!trial.cli && !trial.http) fail('factory_product_trial_invalid', 'Provide at least one http or cli example.');
+  if (redactSensitiveText(json) !== json) fail('factory_product_trial_invalid', 'An example contains text that resembles a credential or another private value. Use neutral sample text.');
   const capability = scaffoldCapability(data);
-  if (capability.adapter !== 'api-process-v1' || !trial.http || capability.interfaces.includes('cli') !== Boolean(trial.cli)) {
-    fail('factory_product_trial_interfaces');
+  if (capability.adapter !== 'api-process-v1') fail('factory_product_trial_interfaces', 'Product examples are supported for a local API process (runtimeFamily=api, serviceMode=process, primaryInterface=api).');
+  if (!trial.http) fail('factory_product_trial_interfaces', 'A local API process needs at least one http example.');
+  if (capability.interfaces.includes('cli') !== Boolean(trial.cli)) {
+    fail('factory_product_trial_interfaces', trial.cli
+      ? 'The Contract declares no CLI interface. Remove the cli examples, or declare secondaryInterfaces=CLI with a cliEntrypoint in the brief.'
+      : 'The Contract declares a CLI interface, so cli examples are required. For an HTTP-only product set secondaryInterfaces=none and omit cliEntrypoint in the brief.');
   }
   if (trial.host_checks !== undefined && (!trial.host_checks || Array.isArray(trial.host_checks)
       || typeof trial.host_checks !== 'object' || Object.entries(trial.host_checks).some(([kind,ids]) =>
         !Object.hasOwn(PRODUCT_HOST_CHECKS,kind) || kind!=='managed_stop' && !llm
         || !Array.isArray(ids) || !ids.length || ids.length>32 || ids.some(id=>typeof id!=='string' || !id || id.length>200)))) {
-    fail('factory_product_trial_coverage_invalid');
+    fail('factory_product_trial_coverage_invalid', 'host_checks accepts managed_stop and, for a Pritha model connection, model_connection and managed_start; each needs a non-empty list.');
   }
   for (const [kind, cases] of Object.entries(trial).filter(([kind])=>kind==='cli' || kind==='http')) {
-    if (!Array.isArray(cases) || cases.length < (modelLed?1:2) || cases.length > 8) fail('factory_product_trial_variants_required');
+    if (!Array.isArray(cases) || cases.length < (modelLed?1:2) || cases.length > 8) fail('factory_product_trial_variants_required', 'Provide between '+(modelLed?1:2)+' and 8 '+kind+' examples.');
     const signatures = new Map(), outputs = new Set();
-    for (const check of cases) {
+    for (const [index, check] of cases.entries()) {
+      const at = kind+'['+index+']: ';
       const fields = kind === 'cli' ? ['argv','expected_exit'] : ['argv','port_variable','path','input_json','expected_status'];
-      if (!check || Array.isArray(check) || Object.keys(check).some(key => ![...fields,'expected_json','covers',...(llm?['model_output','model_error']:[])].includes(key))
-          || !Array.isArray(check.covers) || !check.covers.length || check.covers.some(id=>typeof id!=='string' || id.length>200)) fail('factory_product_trial_invalid');
+      if (!check || Array.isArray(check) || Object.keys(check).some(key => ![...fields,'expected_json','covers',...(llm?['model_output','model_error']:[])].includes(key))) {
+        fail('factory_product_trial_invalid', at+'an example is an object with only its documented fields'+(llm?'.':'; model_output and model_error need a Pritha model connection.'));
+      }
+      if (!Array.isArray(check.covers) || !check.covers.length || check.covers.some(id=>typeof id!=='string' || id.length>200)) fail('factory_product_trial_invalid', at+'name at least one product function that this example demonstrates.');
       nodeCommand(check.argv);
-      if (kind==='cli' && check.argv[1] !== (data.cliEntrypoint || 'scripts/agent-cli.mjs')) fail('factory_product_trial_interfaces');
+      if (kind==='cli' && check.argv[1] !== (data.cliEntrypoint || 'scripts/agent-cli.mjs')) fail('factory_product_trial_interfaces', at+'a cli example must run the Contract CLI entrypoint.');
       const status=kind==='cli'?(check.expected_exit??0):(check.expected_status??200);
       const success=status===(kind==='cli'?0:200);
-      if (!Number.isInteger(status) || !success && (kind==='cli'?status<1 || status>125:status<400 || status>(llm?599:499))) fail('factory_product_trial_invalid');
-      if ((success || Object.hasOwn(check,'expected_json')) && (!check.expected_json || Array.isArray(check.expected_json) || typeof check.expected_json!=='object')) fail('factory_product_trial_invalid');
+      if (!Number.isInteger(status) || !success && (kind==='cli'?status<1 || status>125:status<400 || status>(llm?599:499))) {
+        fail('factory_product_trial_invalid', at+(kind==='cli'?'expected_exit is 0 for success or 1–125 for an error.':'expected_status is 200 for success or 400–'+(llm?599:499)+' for an error.'));
+      }
+      if ((success || Object.hasOwn(check,'expected_json')) && (!check.expected_json || Array.isArray(check.expected_json) || typeof check.expected_json!=='object')) fail('factory_product_trial_invalid', at+'expected_json must be a JSON object, not an array, text or null.');
       if (kind==='http' && check.port_variable!==capability.apiPort.variable) {
         throw Object.assign(new Error('The HTTP Trial must use the Contract port variable.'), {code:'factory_product_trial_port_mismatch', expectedPortVariable:capability.apiPort.variable});
       }
       if (kind==='http' && (check.argv.length!==2 || check.argv[1]!=='scripts/server.mjs'
-          || !/^\/[A-Za-z0-9/_-]{0,120}$/.test(check.path) || check.path.startsWith('//') || !check.input_json || Array.isArray(check.input_json) || typeof check.input_json!=='object')) fail('factory_product_trial_invalid');
+          || !/^\/[A-Za-z0-9/_-]{0,120}$/.test(check.path) || check.path.startsWith('//') || !check.input_json || Array.isArray(check.input_json) || typeof check.input_json!=='object')) {
+        fail('factory_product_trial_invalid', at+'an http example needs a path such as /run (letters, digits, /, _ and - only) and an input_json object.');
+      }
       if(llm){
-        if(success && (check.model_output===undefined || !modelLed && (!JSON.stringify(check.expected_json).includes('__PRITHA_MODEL_TEXT__') || !JSON.stringify(check.model_output || '').includes('__PRITHA_MODEL_TEXT__'))))fail('factory_product_trial_model_proof_required');
-        if(check.model_error!==undefined && (!['provider_pending_auth','provider_unavailable','provider_rate_limited','provider_timeout'].includes(check.model_error) || success || check.model_output!==undefined))fail('factory_product_trial_invalid');
-        if(check.model_output!==undefined && typeof check.model_output!=='string' && (!check.model_output || typeof check.model_output!=='object' || Array.isArray(check.model_output)))fail('factory_product_trial_invalid');
+        if(success && (check.model_output===undefined || !modelLed && (!JSON.stringify(check.expected_json).includes('__PRITHA_MODEL_TEXT__') || !JSON.stringify(check.model_output || '').includes('__PRITHA_MODEL_TEXT__')))) {
+          fail('factory_product_trial_model_proof_required', at+(check.model_output===undefined?'a successful example of a model-connected product needs model_output, the simulated model answer.':'expected_json and model_output must both contain __PRITHA_MODEL_TEXT__.'));
+        }
+        if(check.model_error!==undefined && (!MODEL_ERRORS.includes(check.model_error) || success || check.model_output!==undefined)) {
+          fail('factory_product_trial_invalid', at+'model_error is one of '+MODEL_ERRORS.join(', ')+' and belongs to an error example (status 400–599) without model_output.');
+        }
+        if(check.model_output!==undefined && typeof check.model_output!=='string' && (!check.model_output || typeof check.model_output!=='object' || Array.isArray(check.model_output)))fail('factory_product_trial_invalid', at+'model_output must be text or a JSON object.');
       }
       const signature=canonical(kind==='http'?[check.path,check.input_json]:check.argv);
-      if(signatures.has(signature))fail('factory_product_trial_invalid');
+      if(signatures.has(signature))fail('factory_product_trial_invalid', at+'this request repeats an earlier example; every example needs a different input.');
       signatures.set(signature,success);
       if(success)outputs.add(canonical(check.expected_json));
     }
-    if([...signatures.values()].filter(Boolean).length<(modelLed?1:2) || !modelLed && outputs.size<2)fail('factory_product_trial_variants_required');
+    if([...signatures.values()].filter(Boolean).length<(modelLed?1:2) || !modelLed && outputs.size<2) {
+      fail('factory_product_trial_variants_required', modelLed?'Include at least one successful '+kind+' example.':'Include at least two successful '+kind+' examples with different expected_json.');
+    }
   }
 }
 
@@ -167,7 +189,7 @@ export function prepareProductTrial(paths, outcome, data, trial) {
   if(!next.includes(LOCAL_APPLICATION_TEXT))next+='\n## Local application\n\n'+LOCAL_APPLICATION_TEXT+'\n';
   const validation = validateOutcomeSpecText(next, { root: paths.root });
   if (validation.issues.some(issue => !['OS015', 'OS016'].includes(issue.code))) fail('factory_product_trial_invalid');
-  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data));
+  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data,outcome));
   const file = privateStateFile(paths.stateRoot, path.join(inputRoot, verifierPath));
   const previous = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
   atomicCompareAndSwapFile(file, previous, content);
@@ -204,7 +226,7 @@ export function reviewProductTrials(paths, outcome, data, { includeInputs = true
   }
   if (!includeInputs) return [];
   if (!checked.parsed.trials.some(trial => trial.verifierInputs || trial.productTargets)) return [];
-  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data), { create: false });
+  const inputRoot = privateStateDirectory(paths.stateRoot, factoryTrialInputRoot(paths,data,outcome), { create: false });
   if (!inputRoot) fail('factory_trial_inputs_missing');
   const files=preparedTrialInputFiles({ trials: checked.parsed.trials }, inputRoot).map(file => ({
     path: file.path, sha256: sha256(file.content), content: file.content.toString('utf8'),

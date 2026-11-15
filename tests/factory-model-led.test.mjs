@@ -15,6 +15,11 @@ import {factoryHash} from '../scripts/agents-mother/voice-factory-state.mjs';
 import {FactoryBudget} from '../scripts/agents-mother/factory-budget.mjs';
 import {factoryTrialInputRoot} from '../scripts/agents-mother/factory-proposal-revision.mjs';
 
+import {execFileSync} from 'node:child_process';
+import {readAgentResultReadiness} from '../scripts/agents-mother/result-readiness.mjs';
+import {childInteractionDefinition} from '../scripts/lib/child-interaction.mjs';
+import {improving} from '../scripts/agents-mother/factory-improvement.mjs';
+
 const providers=[['codex','gpt-6-astra','openai','gpt-4.1-mini'],['claude','claude-sonnet-5-5','claude','claude-haiku-4-5-20251001'],['neuraldeep','gpt-oss-120b','neuraldeep','gpt-oss-20b']];
 async function fixture(t,provider,extra={}){
  const [connectorId,model,childProvider,childModel]=provider;
@@ -173,6 +178,17 @@ test('NeuralDeep corrects an accepted preparation proposal and builds the same c
  await f.call('approve_contract',{expected_sha256:firstDraft.sha256});
  assert.equal(f.state().contractApproval.approvedBy,'pritha');
  await f.call('create_outcome');
+ // This is where a live NeuralDeep builder stopped on 2026-11-14: a draft
+ // Outcome without examples. The host must point back to the structured
+ // proposal instead of the low-level product Trial tool.
+ const stuck=(await f.call('status')).nextStep;
+ assert.equal(stuck.owner,'model');assert.equal(stuck.action,'propose');assert.equal(stuck.reason,'factory_product_trial_model_proof_required');
+ // The same dead end without a saved structured proposal (drafts written by
+ // hand under the creation request) used to recommend prepare_product_trial.
+ const saved=fs.readFileSync(f.paths.file,'utf8'),manual=JSON.parse(saved);delete manual.preparation;fs.writeFileSync(f.paths.file,JSON.stringify(manual));
+ const byHand=(await f.call('status')).nextStep;fs.writeFileSync(f.paths.file,saved);
+ assert.equal(byHand.owner,'model');assert.equal(byHand.action,'propose');assert.equal(byHand.reason,'product_examples_required');
+ assert.deepEqual(byHand.requiredFields,['brief','product','build_token_budget']);assert.match(byHand.hint,/model_output for every successful example/);assert.doesNotMatch(byHand.hint,/prepare_product_trial/);
  const originalContract=f.artifact('contract'),originalOutcome=f.artifact('outcome'),authority=f.state().creationAuthority;
  await new FactoryBudget({...f.paths,chatId:f.chatId,connectorId:'neuraldeep'}).observe('original-preparation','preparation',{observedTokens:12345,chargedTokens:16000,activeMs:5000,usageKnown:false});
  const budgetFile=path.join(f.paths.directory,'workflow-budget.json'),budget=JSON.parse(fs.readFileSync(budgetFile));
@@ -250,4 +266,124 @@ test('a draft edit cannot manufacture host-owned proposal lineage or verifier st
    const result=await f.call('patch_draft',{artifact:'contract',expected_sha256:row.sha256,edits:[{from:'status: draft',to:field+'\nstatus: draft'}]});
    assert.equal(result.error,'factory_draft_identity_invalid');assert.equal(f.artifact('contract').sha256,row.sha256);
  }
+});
+
+// The last link of the target path: create, open the card, launch, try, stop, improve.
+async function built(t,provider,patch=()=>{}){
+ const f=await fixture(t,provider);patch(f);
+ const proposed=await f.call('propose',f.input);assert.equal(proposed.error,undefined,JSON.stringify(proposed));
+ const finished=await f.call('research_decide',{answer:'Memory and the built-in local API adapter are sufficient for this simple response; verify the model connection and lifecycle through execution.'});
+ assert.equal(finished.error,undefined,JSON.stringify(finished));assert.equal(f.state().phase,'awaiting-manual-acceptance',JSON.stringify(finished));
+ const git=(...args)=>execFileSync('git',args,{cwd:f.paths.target,encoding:'utf8'}).trim();
+ const readiness=()=>readAgentResultReadiness(f.state().agentId,{root:f.paths.root,stateRoot:f.paths.stateRoot,agentParent:f.paths.parent});
+ const verifier=()=>fs.readFileSync(path.join(f.paths.target,'verification/product.mjs'),'utf8');
+ return Object.assign(f,{git,readiness,verifier,applied:{head:git('rev-parse','HEAD'),outcome:f.state().outcome,runId:f.state().runId,verifier:verifier()}});
+}
+const revised=(f,error)=>{const product=structuredClone(f.input.product);product.http[1].expected_json={error};return product;};
+
+for(const provider of providers.slice(0,2))test(provider[0]+': a built agent is revised by new examples beside its applied version, which is replaced only by the verified revision',{timeout:180000},async t=>{
+ const f=await built(t,provider),v1=f.applied;
+ const before=await f.call('status');
+ assert.deepEqual(before.nextStep.revisionAfterBuild,{available:true,action:'improve',requiredFields:['product'],optionalFields:['note']});
+ // The examples of the applied version and its numbered functions are handed out as the starting point.
+ assert.deepEqual(before.revisionBase,{coreFunctions:f.brief.coreFunctions,product:f.input.product});
+ assert.equal(f.readiness().verification.status,'verified');
+ // The same examples describe nothing to build, and a second build is not a revision.
+ assert.equal((await f.call('improve',{product:f.input.product})).error,'factory_improvement_unchanged');
+ assert.equal((await f.call('deliver')).error,'factory_delivery_already_started');
+ assert.equal(f.state().runId,v1.runId);assert.equal(f.builds.length,1);
+ // The user asks for another error code on blank input; the synthetic builder can produce it.
+ f.scenario.invalidError='empty_text';
+ // In the second variant the user left the applied version running while the revision was built.
+ const running=provider[0]==='claude',record=path.join(f.paths.target,'.state/service.pid.json');
+ if(running){fs.mkdirSync(path.dirname(record),{recursive:true});fs.writeFileSync(record,JSON.stringify({pid:process.pid,instance_id:'applied-version'}));}
+ const result=await f.call('improve',{product:revised(f,'empty_text'),note:'Blank input should answer empty_text instead of invalid_text.'});
+ assert.equal(result.error,undefined,JSON.stringify(result));assert.equal(result.continuationFailed,false,JSON.stringify(result));
+ assert.deepEqual(result.continued,['create_outcome','prepare_product_trial','approve_outcome','deliver','finish']);
+ assert.equal(f.reviews.length,0,'a model-led revision before acceptance asks for no document vote');
+ if(running){
+  // Verified, but not applied over a running agent: the project and the card still hold the applied version.
+  const waiting=f.state();
+  assert.equal(waiting.phase,'card-blocked');assert.equal(improving(waiting),true);assert.deepEqual(waiting.localApplication,{status:'pending',reason:'service_record_present'});
+  assert.equal(f.git('rev-parse','HEAD'),v1.head);assert.equal(f.verifier(),v1.verifier);
+  assert.equal(f.progress().milestone.label,'Stop the agent to apply');
+  const pending=f.readiness();assert.deepEqual({status:pending.verification.status,run:pending.run.id},{status:'verified',run:v1.runId});assert.equal(pending.pending.run.id,waiting.runId);
+  const next=(await f.call('status')).nextStep;
+  assert.deepEqual({owner:next.owner,reason:next.reason,why:next.applicationReason,then:next.then},{owner:'user',reason:'revision_not_applied',why:'service_record_present',then:'finish'});
+  assert.equal((await f.call('improve',{product:revised(f,'blank_text')})).reason,'improvement_in_progress');
+  // The user stops the agent; applying the revision needs no rebuild.
+  fs.rmSync(record);
+  const applied=await f.call('finish');assert.equal(applied.error,undefined,JSON.stringify(applied));assert.deepEqual(applied.improvement,{number:1,applied:true});
+  assert.equal(f.builds.length,2);
+ }
+ const state=f.state();
+ assert.equal(state.phase,'awaiting-manual-acceptance');assert.equal(f.builds.length,2);
+ assert.notEqual(state.runId,v1.runId);assert.notEqual(state.outcome,v1.outcome);assert.equal(improving(state),false);
+ assert.deepEqual({number:state.improvement.number,replaced:state.improvement.replaced,applied:state.improvement.applied},{number:1,replaced:{outcome:v1.outcome,runId:v1.runId},applied:undefined});
+ // Same accepted Contract; the revised Outcome names the one it replaced, which left use only now.
+ assert.equal(readAgentCatalog({root:f.paths.root,stateRoot:f.paths.stateRoot,agentParent:f.paths.parent,fresh:true}).agents.filter(agent=>agent.agentId===state.agentId).length,1);
+ const outcome=f.artifact('outcome');
+ assert.equal(outcome.frontmatter.status,'approved');assert.equal(outcome.frontmatter.approved_by,'pritha');assert.equal(outcome.frontmatter.factory_outcome_revision,'1');
+ assert.deepEqual(outcome.frontmatter.supersedes.map(entry=>path.resolve(f.paths.root,entry)),[v1.outcome]);
+ assert.match(fs.readFileSync(v1.outcome,'utf8'),/^status: superseded$/m);
+ assert.equal(verifyOutcomeApproval(outcome.file,f.paths).ok,true);
+ // The project moved forward by a fast-forward: verifier commit, then the verified build.
+ assert.notEqual(f.git('rev-parse','HEAD'),v1.head);assert.equal(f.git('merge-base','--is-ancestor',v1.head,'HEAD'),'');
+ assert.equal(f.git('status','--porcelain'),'');assert.match(f.git('log','--format=%s',v1.head+'..HEAD'),/Pritha verifier for revised outcome/);
+ assert.match(f.verifier(),/empty_text/);assert.notEqual(f.verifier(),v1.verifier);
+ // The earlier version's prepared verifier is history, not overwritten.
+ assert.equal(fs.readFileSync(path.join(factoryTrialInputRoot(f.paths,contractData(state.contract,{root:f.paths.root})),'verification/product.mjs'),'utf8'),v1.verifier);
+ assert.match(fs.readFileSync(path.join(factoryTrialInputRoot(f.paths,contractData(state.contract,{root:f.paths.root}),outcome),'verification/product.mjs'),'utf8'),/empty_text/);
+ const ready=f.readiness();
+ assert.deepEqual({status:ready.verification.status,run:ready.run.id,pending:ready.pending},{status:'verified',run:state.runId,pending:undefined});
+ assert.equal(childInteractionDefinition(f.paths.target,outcome.text).path,'/run');
+ const progress=f.progress();assert.equal(progress.firstUse.disposition,'applied-local-project');
+ assert.match(progress.milestone.summary,/revision 1 is in the project folder and replaced the earlier version/);
+ // The builder was told what it revises.
+ const ledger=readDeliveryLedger(deliveryStatus(state.runId,f.paths).runRoot);
+ assert.match(ledger.operator_guidance,/revises an agent that already works/);assert.match(ledger.operator_guidance,/empty_text instead of invalid_text/);
+ const after=await f.call('status');
+ assert.equal(after.improvement.inProgress,false);assert.deepEqual(after.revisionBase.product,revised(f,'empty_text'),'the next revision starts from the examples now applied');
+});
+
+test('a revision that cannot be built leaves the applied version verified, usable and in the project, and can be replaced by another revision',{timeout:240000},async t=>{
+ const f=await built(t,providers[1],f=>{f.input.build_iteration_budget=2;}),v1=f.applied;
+ // The builder keeps producing the old behavior, so the revised example never passes.
+ const result=await f.call('improve',{product:revised(f,'empty_text'),note:'Blank input should answer empty_text.'});
+ assert.equal(result.error,undefined,JSON.stringify(result));
+ let state=f.state();
+ assert.equal(improving(state),true);assert.notEqual(state.outcome,v1.outcome);assert.notEqual(state.runId,v1.runId);
+ const run=deliveryStatus(state.runId,f.paths),ledger=readDeliveryLedger(run.runRoot);
+ assert.equal(ledger.status,'blocked',JSON.stringify(ledger.blockers));assert.equal(ledger.iteration,2);
+ // Nothing reached the project: same commit, same verifier, clean tree.
+ assert.equal(f.git('rev-parse','HEAD'),v1.head);assert.equal(f.verifier(),v1.verifier);assert.equal(f.git('status','--porcelain'),'');
+ // Two Outcomes are approved now. The card reports and serves the applied one and says a revision is pending.
+ assert.match(fs.readFileSync(v1.outcome,'utf8'),/^status: approved$/m);assert.equal(f.artifact('outcome').frontmatter.status,'approved');
+ const ready=f.readiness();
+ assert.deepEqual({status:ready.verification.status,run:ready.run.id,head:ready.verification.head},{status:'verified',run:v1.runId,head:v1.head});
+ assert.deepEqual({run:ready.pending.run.id,status:ready.pending.run.status},{run:state.runId,status:'blocked'});
+ assert.equal(childInteractionDefinition(f.paths.target,fs.readFileSync(v1.outcome,'utf8')).path,'/run');
+ assert.throws(()=>childInteractionDefinition(f.paths.target,f.artifact('outcome').text),{code:'agent_verification_changed'});
+ let status=await f.call('status');
+ assert.equal(status.improvement.inProgress,true);assert.equal(status.nextStep.owner,'user');
+ assert.equal((await f.call('improve',{product:revised(f,'blank_text')})).reason,'improvement_in_progress');
+ // The user ends the revision. The applied version is still the agent.
+ const stop=ledger.blockers[0].options.map(option=>option.id).find(id=>['stop-run','abandon'].includes(id));assert.ok(stop,JSON.stringify(ledger.blockers[0].options));
+ const ended=f.call('delivery_resume',{answer:stop});
+ await until(()=>f.pending().length===1);await f.answer();assert.equal((await ended).error,undefined);
+ assert.equal(readDeliveryLedger(run.runRoot).status,'abandoned');
+ assert.equal(f.progress().milestone.label,'Revision stopped');assert.equal(f.readiness().verification.status,'verified');
+ status=await f.call('status');
+ // Another revision replaces the ended one and still starts from the applied version.
+ f.scenario.invalidError='blank_text';
+ const failedOutcome=f.state().outcome;
+ const again=await f.call('improve',{product:revised(f,'blank_text'),note:'Blank input should answer blank_text.'});
+ assert.equal(again.error,undefined,JSON.stringify(again));assert.equal(again.continuationFailed,false,JSON.stringify(again));
+ state=f.state();
+ assert.equal(state.phase,'awaiting-manual-acceptance');assert.equal(improving(state),false);
+ assert.deepEqual({number:state.improvement.number,replaced:state.improvement.replaced},{number:2,replaced:{outcome:v1.outcome,runId:v1.runId}});
+ assert.match(fs.readFileSync(failedOutcome,'utf8'),/^status: superseded$/m);assert.match(fs.readFileSync(v1.outcome,'utf8'),/^status: superseded$/m);
+ assert.deepEqual(f.artifact('outcome').frontmatter.supersedes.map(entry=>path.resolve(f.paths.root,entry)),[v1.outcome]);
+ assert.match(f.verifier(),/blank_text/);assert.notEqual(f.git('rev-parse','HEAD'),v1.head);
+ const final=f.readiness();assert.deepEqual({status:final.verification.status,run:final.run.id,pending:final.pending},{status:'verified',run:state.runId,pending:undefined});
 });

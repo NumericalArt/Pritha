@@ -141,6 +141,7 @@ export type ControlCenterAgentOperationalReadinessStatus =
   | "tailscale_pending"
   | "unmanaged_local"
   | "service_install_required"
+  | "stopped"
   | "blocked"
   | "missing";
 

@@ -560,6 +560,18 @@ export class CodexAppServerBuildExecutor {
 /** The delivery contract authorizes implementation within its disposable
  * worktree. Host tools still enforce immutable verifier paths and closed egress;
  * an approval callback cannot widen that boundary. */
+/** What the host reserved for an attempt that contains requests the provider
+ * never measured: every measured request plus the full reservation of each
+ * unmeasured one. Null when any part of that is not known. This is not usage;
+ * the delivery ledger decides whether the attempt is counted at this amount. */
+function reservedUsageBound(accounting,tokenBudget){
+  const rows=accounting?.requests,whole=value=>Number.isSafeInteger(value) && value>=0;
+  if(accounting?.tokenBudget!==tokenBudget || !Array.isArray(rows) || !rows.length || rows.length>384 || !rows.some(row=>row.status!=='measured')
+    || !rows.every(row=>row.status==='measured'?whole(row.usage?.totalTokens):['reserved','unknown'].includes(row.status) && whole(row.reservedTokens)))return null;
+  const total=rows.reduce((sum,row)=>sum+(row.status==='measured'?row.usage.totalTokens:row.reservedTokens),0);
+  return whole(total)?total:null;
+}
+
 export class ClaudeCodeBuildExecutor {
   constructor(options={}){this.name='claude-code-build';this.connectorId='claude';this.providerName='anthropic';this.defaultLaunch=startClaudeCodeRun;this.options=options;this.active=new Set();}
   context(input={}){
@@ -639,7 +651,9 @@ export class ClaudeCodeBuildExecutor {
         const result=await run.completion;exitConfirmed=result.processTreeExited===true;
         const accounting=result.budget,measured=accounting?.usageKnown===true && Number.isSafeInteger(accounting.tokensUsed);
         const report=this.report(finalText),ok=result.ok && report!==null,errorCode=workflowBudgetCode(result.errorCode) || (!report?'build_summary_invalid':null);
-        receipt={...receipt,...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
+        // An attempt that ended with an unmeasured request also says what was reserved for it.
+        const reserved=exitConfirmed && !measured?reservedUsageBound(accounting,receipt.token_budget):null;
+        receipt={...receipt,...(reserved!==null?{usage_upper_bound:reserved}:{}),...(report || {summary:'The build returned no valid structured summary.',changed_files:[],remaining_risks:['Review the recorded tool results and independent Trials.']}),status:exitConfirmed?(ok?'completed':'failed'):'uncertain',turn_status:exitConfirmed?(ok?'completed':'interrupted'):'unknown',process_exited:exitConfirmed,
           model_observed:result.sessionId?result.model || receipt.model_pinned:null,provider_observed:result.sessionId?this.providerName:null,thread_id:result.sessionId || receipt.thread_id,
           thread_cleanup:exitConfirmed?'closed':'pending',tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':'unknown',duration_ms:Date.now()-began,error_code:errorCode,
           provider_response_diagnostics:(accounting?.requests || []).map(row=>row.responseDiagnostics).filter(Boolean)};
@@ -672,7 +686,14 @@ export class ClaudeCodeBuildExecutor {
         && Array.isArray(accounting.requests) && accounting.requests.length<=384 && accounting.requests.every(row=>row.status==='measured' && Number.isSafeInteger(row.usage?.totalTokens) && row.usage.totalTokens>=0)
         && accounting.requests.reduce((sum,row)=>sum+row.usage.totalTokens,0)===accounting.tokensUsed;
       const notStarted=receipt.process_exited===true && receipt.usage_status==='not-started';
-      const result={...receipt,process_exited:true,thread_cleanup:'closed',status:receipt.status==='completed'?'completed':'interrupted',turn_status:receipt.status==='completed'?'completed':'interrupted',
+      // A request cut off before the provider reported usage can never be
+      // measured afterwards. Its usage stays unknown; the figure only states
+      // what the host reserved for the attempt. It is derived from the current
+      // budget receipt on every recovery; an earlier one is never carried over.
+      const reserved=!measured && !notStarted?reservedUsageBound(accounting,receipt.token_budget):null;
+      const {usage_upper_bound:previousBound,...current}=receipt;
+      const result={...current,process_exited:true,thread_cleanup:'closed',status:receipt.status==='completed'?'completed':'interrupted',turn_status:receipt.status==='completed'?'completed':'interrupted',
+        ...(reserved!==null?{usage_upper_bound:reserved}:{}),
         tokens_used:measured?accounting.tokensUsed:null,usage_status:measured?'measured':notStarted?'not-started':'unknown',
         model_observed:receipt.model_observed || (accounting?.requests?.some(row=>row.status==='measured')?receipt.model_pinned:null)};
       coordinator.updateIntent(key,{state:result.status,receipt:result});coordinator.reconcileRelease(intent.owner,intent.generation);await input.onCheckpoint?.(result);return result;

@@ -1,4 +1,4 @@
-import {reconcileFactoryReceipt} from '../agents-mother/factory-receipt-recovery.mjs';
+import {reconcileFactoryReceipt,releaseInterruptedFactoryStep} from '../agents-mother/factory-receipt-recovery.mjs';
 import { createHash,randomUUID } from 'node:crypto';
 import { closeSync,constants,existsSync,fstatSync,fsyncSync,lstatSync,openSync,opendirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -52,7 +52,7 @@ export class ProviderHostTools {
   async runAndContinue(key,requestHash,name,input){
     const result=await this.execute(key,requestHash,name,input);
     if(!this.driveEnabled() || name!=='factory_step' || result.isError ||
-        !['propose','init','continue','write_draft','patch_draft','approve_contract','approve_outcome','prepare_product_trial','research','research_decide','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
+        !['propose','improve','init','continue','write_draft','patch_draft','approve_contract','approve_outcome','prepare_product_trial','research','research_decide','research_collect','research_apply','scaffold','deliver','verify','delivery_extend','delivery_resume'].includes(input.action))return result;
     const steps=[];let last;
     for(let n=0;n<8;n++){
       this.check();
@@ -168,6 +168,9 @@ export class ProviderHostTools {
             return {...text({...this.window(saved,{}),status:r.ok?'completed':'failed',operationId:recovered.input.operation_id}),isError:!r.ok};
           }
         }
+        // No receipt and a proven process exit: an interrupted build step no
+        // longer blocks this session. Its run resumes from the delivery ledger.
+        else releaseInterruptedFactoryStep(this.factory.paths,this.options);
       }
       ({kind,presentation,perform,alreadyApproved=false}=this.factory.prepare(input));
     }else if(name==='write_file' || name==='edit_file'){

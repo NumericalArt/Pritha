@@ -126,6 +126,9 @@ test('unapproved returned calls and model drift never release executable calls o
     assert.match(body,mode==='model'?/neuraldeep_model_identity_mismatch/:/provider_tool_identity_mismatch/);
     assert.doesNotMatch(body,/"type":"(?:function_call|custom_tool_call|local_shell_call)"/);
     assert.equal(calls,1);assert.equal(receipts.length,1);assert.equal(receipts[0].error.class,'input');
+    // The refused response still records which public model ID the provider answered with, and nothing else from it.
+    if(mode==='model'){assert.equal(receipts[0].modelDiagnostic.returned,'foreign-model');assert.equal(typeof receipts[0].modelDiagnostic.requested,'string');assert.doesNotMatch(body,/foreign-model/);}
+    else assert.equal(receipts[0].modelDiagnostic,undefined);
   }
 });
 

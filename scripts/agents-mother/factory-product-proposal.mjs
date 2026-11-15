@@ -1,5 +1,5 @@
 import {coverageId} from './outcome-spec.mjs';
-import {validateProductTrial} from './factory-product-trial.mjs';
+import {validateProductTrial,PRODUCT_MODEL_ERRORS} from './factory-product-trial.mjs';
 import {apiProcessPortConfiguration} from './scaffold/api-process.mjs';
 import {parseBoundedJson} from '../lib/bounded-json.mjs';
 import {supportsLocalApiContinuation} from './factory-continuation.mjs';
@@ -67,7 +67,9 @@ export function compileProductProposal(product,data){
 
 const jsonObject={type:'object',additionalProperties:true};
 const functions={type:'array',minItems:1,maxItems:32,items:{type:'integer',minimum:1,maximum:32},description:'One-based indexes of brief.coreFunctions exercised by this example. No hashes or generated coverage IDs.'};
-const common={functions,expected_json:jsonObject,model_output:{anyOf:[{type:'string'},jsonObject]},model_error:{type:'string'}};
+const common={functions,expected_json:jsonObject,
+  model_output:{anyOf:[{type:'string'},jsonObject],description:'The simulated answer of the child model for this example: text or a JSON object. Required for every successful example of a model-connected product.'},
+  model_error:{type:'string',enum:[...PRODUCT_MODEL_ERRORS],description:'Only for an error example (expected_status 400–599) of a model-connected product: the simulated failure of its model connection. Omit model_output in that example.'}};
 export const PRODUCT_PROPOSAL_SCHEMA={type:'object',additionalProperties:false,required:['http'],properties:{
   http:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','path','input_json','expected_json'],properties:{...common,path:{type:'string'},input_json:jsonObject,expected_status:{type:'integer',minimum:200,maximum:599}}}},
   cli:{type:'array',minItems:1,maxItems:8,items:{type:'object',additionalProperties:false,required:['functions','arguments','expected_json'],properties:{...common,arguments:{type:'array',items:{type:'string'}},expected_exit:{type:'integer',minimum:0,maximum:125}}}},
