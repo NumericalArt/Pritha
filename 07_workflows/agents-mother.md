@@ -1154,6 +1154,28 @@ protected evidence failures keep their existing recovery boundaries. Tune
 economic defaults later from recorded successful outcomes, token usage,
 active time and correction histories.
 
+## Agent card contract at handoff
+
+The factory hands an agent over only when its card works. After `finish`
+applies the verified version, the host reads the agent's card from the Control
+Center that serves this instance. That is the same card the operator sees, so
+the check and the card cannot disagree. The card must show:
+
+- a confirmed agent identity;
+- a documented mission;
+- an assigned version;
+- a verified result;
+- "Try this agent" for an HTTP agent built from the API process scaffold;
+- a Start that can be executed.
+
+Any gap keeps the factory in `card-blocked`. The step names the gaps, and
+`finish` can run again once they are fixed. Services stay stopped during the
+check.
+
+A Control Center of another instance is never used. Its health must report
+this instance's id and port. A headless run without a Control Center keeps the
+static card checks and records `cardContract: not-checked`.
+
 ## Removing an agent
 
 The agent's action panel offers "Remove agent…". Only children built by the

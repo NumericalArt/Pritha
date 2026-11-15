@@ -345,12 +345,17 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
         state.improvement={...revision,appliedAt:new Date().toISOString(),replaced:{outcome:applied.outcome,runId:applied.runId}};
       }
       const {rebuildRegistry}=dependencies.registry || await import('./registry.mjs');const {checkCardReadiness}=dependencies.cards || await import('./card-readiness.mjs');rebuildRegistry();
-      const card=await checkCardReadiness(state.agentId,{...options,baseUrl:false});
+      // The card is part of the handoff: checked live in this instance's Control Center (2026-11-15).
+      // Without one (a headless run), the static card checks remain and the result says so.
+      const {instanceControlCenterUrl}=dependencies.cards || await import('./card-readiness.mjs');
+      const controlCenter=await (instanceControlCenterUrl || (async()=>null))(options);
+      const card=controlCenter?await checkCardReadiness(state.agentId,{...options,handoff:true,baseUrl:controlCenter,timeoutMs:15000})
+        :{...await checkCardReadiness(state.agentId,{...options,baseUrl:false}),cardContract:'not-checked: no Control Center serves this instance'};
       const accepted=result.state.status==='accepted';
       // A verified revision that could not be applied yet (the agent is running, or the project changed) is not
       // the version in use: the card still serves the applied one, so the handoff is not complete.
       const unapplied=improving(state);
-      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,...(state.improvement?{improvement:{number:state.improvement.number,applied:!unapplied}}:{}),next:unapplied?'The revision is verified but not applied: '+(state.localApplication?.reason==='service_record_present'?'the agent is running its applied version. Ask the user to stop it from its card, then call finish again.':'resolve the reported application condition, then call finish again.')+' The applied version is unchanged.':card.status!=='ready'?'Complete local application or resolve the reported card configuration blockers.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready' && !unapplied?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
+      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,...(state.improvement?{improvement:{number:state.improvement.number,applied:!unapplied}}:{}),next:unapplied?'The revision is verified but not applied: '+(state.localApplication?.reason==='service_record_present'?'the agent is running its applied version. Ask the user to stop it from its card, then call finish again.':'resolve the reported application condition, then call finish again.')+' The applied version is unchanged.':card.status!=='ready'?'The agent is not handed over until its card works: '+(card.blockers||[]).slice(0,4).join(' ')+' Resolve these (or the local application condition), then call finish again.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready' && !unapplied?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }

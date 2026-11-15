@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { checkCardReadiness } from "../scripts/agents-mother/card-readiness.mjs";
+import { checkCardReadiness, instanceControlCenterUrl } from "../scripts/agents-mother/card-readiness.mjs";
 
 function writeRegistry(root, rows = []) {
   const registryDir = path.join(root, ".private", "agents");
@@ -368,4 +368,62 @@ test("card readiness reports unknown operations applicability without an authore
   assert.equal(result.folderPresent, true);
   assert.equal(result.manifestPresent, false);
   assert.match(result.blockers.join("\n"), /Operations applicability needs an accepted contract/);
+});
+
+// An agent the factory hands over must have a card the operator can use. The
+// contract reads the live Control Center card, so a gap in version, mission,
+// verification, "Try this agent" or Start blocks the handoff (2026-11-15).
+test("the handoff card contract reads the live card and blocks what the operator could not use", async () => {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "pritha-card-handoff-"));
+  const root = path.join(parent, "Pritha");
+  const projectRoot = path.join(parent, "AlphaAgent");
+  mkdirSync(projectRoot, { recursive: true });
+  writeRegistry(root, ["| AlphaAgent | fixture mission | codex-native | cli / Telegram none | local Mac | manual | contracts:1 scaffold:1 |"]);
+  writeManifest(projectRoot, { scaffold_adapter: "api-process-v1" });
+  const complete = { id: "alpha-agent", name: "AlphaAgent", identity: { status: "identified" }, mission: "Announce berths for cargo.", version: "v1", versionStatus: "ready",
+    resultReadiness: { verification: { status: "verified" } }, operations: { interactionUrl: "/agents/alpha-agent#try-agent" }, ui: { primaryAction: "start" }, control: { planAction: "start" } };
+  let card = complete, reachable = true;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (!reachable) throw new Error("connect ECONNREFUSED");
+    const urlText = String(url);
+    if (urlText.endsWith("/api/agents")) return Response.json({ agents: [card] });
+    if (urlText.endsWith("/api/agents/alpha-agent/actions/start/plan")) return Response.json({ status: "needs_confirmation", actionEnabled: true, blockers: [], control: { executionMode: "executable" } });
+    return new Response("not found", { status: 404 });
+  };
+  try {
+    const ready = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test", handoff: true });
+    assert.equal(ready.status, "ready");
+    assert.deepEqual(ready.cardContract.map((item) => `${item.id}:${item.status}`), ["identity:pass", "mission:pass", "version:pass", "verified:pass", "try:pass", "start:pass"]);
+    card = { ...complete, mission: "Mission is not documented", versionStatus: "unavailable", version: "v?", operations: {}, resultReadiness: { verification: { status: "stale" } } };
+    const gaps = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test", handoff: true });
+    assert.equal(gaps.status, "blocked");
+    for (const text of ["no documented mission", "no assigned version", "does not show a verified result", "no \"Try this agent\""]) assert.ok(gaps.blockers.some((line) => line.includes(text)), text);
+    const outsideHandoff = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test" });
+    assert.equal(outsideHandoff.cardContract, undefined, "the scaffold stage keeps its own checks");
+    reachable = false;
+    const offline = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test", handoff: true });
+    assert.equal(offline.status, "blocked");
+    assert.ok(offline.blockers.includes("The Control Center is unavailable, so the agent card could not be checked."));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("the handoff checks the card only in the Control Center that serves this instance", async () => {
+  const originalFetch = globalThis.fetch;
+  let instance = { id: "alpha", role: "primary", port: 4567 };
+  const seen = [];
+  globalThis.fetch = async (url) => { seen.push(String(url)); return Response.json({ ok: true, instance }); };
+  try {
+    const env = { PRITHA_INSTANCE_ID: "alpha", PRITHA_CONTROL_CENTER_PORT: "4567" };
+    assert.equal(await instanceControlCenterUrl({ env }), "http://127.0.0.1:4567");
+    assert.deepEqual(seen, ["http://127.0.0.1:4567/api/health"]);
+    instance = { id: "main", role: "primary", port: 4567 };
+    assert.equal(await instanceControlCenterUrl({ env }), null, "another instance on this port is not ours");
+    globalThis.fetch = async () => { throw new Error("connect ECONNREFUSED"); };
+    assert.equal(await instanceControlCenterUrl({ env }), null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

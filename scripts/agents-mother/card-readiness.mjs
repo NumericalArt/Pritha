@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { latestOutcomeSpecForContract, verifyOutcomeApproval } from "./outcome-spec.mjs";
 import path from "node:path";
 import { parseFrontmatterData } from "../lib/frontmatter.mjs";
-import { resolvePrithaRoot } from "../lib/paths.mjs";
+import { prithaInstanceConfig, resolvePrithaRoot } from "../lib/paths.mjs";
 import { readAgentCatalog, findCatalogAgent, agentAlias, agentOperationsApplicability, readAgentOperationsManifest } from "./identity.mjs";
 import { readAgentResultReadinessAsync, unavailableResultReadiness } from "./result-readiness-async.mjs";
 
@@ -157,6 +157,15 @@ async function liveControlCenterCard(params) {
     baseUrl,
     agentId: agent.id,
     agentName: agent.name,
+    // What the operator's card actually shows; the handoff contract reads these.
+    card: {
+      identityStatus: typeof agent.identity === "object" ? agent.identity?.status : agent.identityStatus || null,
+      missionDocumented: Boolean(agent.mission && !/Mission is not documented/.test(agent.mission)),
+      version: agent.version || null,
+      versionStatus: agent.versionStatus || null,
+      verification: agent.resultReadiness?.verification?.status || null,
+      tryAvailable: Boolean(agent.operations?.interactionUrl),
+    },
     action,
     actionPlanAvailable: planResponse.ok,
     actionPlanStatus: normalizedActionPlanStatus(planResponse.value),
@@ -167,6 +176,39 @@ async function liveControlCenterCard(params) {
     actionPlanRequiredPhrase: planResponse.value?.confirmation?.requiredPhrase,
     reason: planResponse.ok ? undefined : `Action plan unavailable: HTTP ${planResponse.status || "unreachable"}`,
   };
+}
+
+/**
+ * The Control Center that serves this instance, or null. A Control Center of
+ * another instance on the default port is never taken for this one's.
+ */
+export async function instanceControlCenterUrl(options = {}) {
+  const config = prithaInstanceConfig(options);
+  const baseUrl = `http://127.0.0.1:${config.controlCenterPort}`;
+  const health = await fetchJson(`${baseUrl}/api/health`, 3000);
+  return health.ok && health.value?.instance?.id === config.instanceId && Number(health.value?.instance?.port) === config.controlCenterPort ? baseUrl : null;
+}
+
+/**
+ * What a handed-over factory agent's card must show. HTTP agents built from the
+ * API process scaffold also need "Try this agent"; tool servers do not.
+ */
+export function handoffCardContract(live, manifest) {
+  const item = (id, ok, message) => ({ id, status: ok ? "pass" : "fail", message });
+  if (live.visible !== true) {
+    return [item("card-visible", false, live.visible === false
+      ? "The agent card is missing from the Control Center."
+      : "The Control Center is unavailable, so the agent card could not be checked.")];
+  }
+  const card = live.card || {};
+  return [
+    item("identity", card.identityStatus === "identified", "The card does not show a confirmed agent identity."),
+    item("mission", card.missionDocumented, "The card shows no documented mission."),
+    item("version", card.versionStatus === "ready", "The card shows no assigned version."),
+    item("verified", card.verification === "verified", "The card does not show a verified result."),
+    ...(manifest?.scaffold_adapter === "api-process-v1" ? [item("try", card.tryAvailable, "The card offers no \"Try this agent\" for this HTTP agent.")] : []),
+    item("start", live.action !== "start" || live.actionExecutionMode === "executable", "Start on the card cannot be executed."),
+  ];
 }
 
 export async function checkCardReadiness(target, options = {}) {
@@ -267,6 +309,11 @@ export async function checkCardReadiness(target, options = {}) {
   if (live.actionPlanBlockers?.length) {
     nextActions.push("Resolve runtime blockers when Start/Stop should become executable.");
   }
+  // The handoff contract: an agent the factory hands over has a card the
+  // operator can use. It is read from the live Control Center card, so the
+  // check and the card cannot disagree (2026-11-15).
+  const cardContract = options.handoff ? handoffCardContract(live, manifest) : null;
+  if (cardContract) for (const entry of cardContract.filter((row) => row.status !== "pass")) blockers.push(entry.message);
 
   const localCardReady = Boolean(record && folder && (manifest || applicability.manifestRequired === false) && blockers.length === 0);
   const status = !record || live.visible === false ? "missing" : localCardReady ? "ready" : "blocked";
@@ -294,6 +341,7 @@ export async function checkCardReadiness(target, options = {}) {
     rawActionPlanStatus: live.rawActionPlanStatus,
     actionExecutionMode: live.actionExecutionMode,
     runtimeBlockers: live.actionPlanBlockers || [],
+    ...(cardContract ? { cardContract } : {}),
     blockers,
     nextActions: [...new Set(nextActions)],
     evidence,
