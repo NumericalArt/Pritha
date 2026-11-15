@@ -4,6 +4,17 @@ import {PROVIDER_CONNECTOR_IDS,PROVIDER_LABELS,type ProviderConnectorId,type Pro
 import type {DraftProviderSelection} from '@/lib/codex-chat/draft-session';
 import type {RuntimeStatus} from '@/lib/codex-chat/types';
 
+const EFFORT_RANK=['none','minimal','low','medium','high','xhigh','max','ultra'];
+/** The strongest offered level that does not exceed the chosen one, or the
+ * lowest offered level when none does. A non-ranked choice such as "default"
+ * becomes the model's own default. */
+export function supportedEffort(effortIds:string[],current:string|undefined,modelDefault?:string|null){
+  if(!effortIds.length || !current || effortIds.includes(current))return current;
+  const ranked=effortIds.filter(id=>EFFORT_RANK.includes(id)).sort((a,b)=>EFFORT_RANK.indexOf(a)-EFFORT_RANK.indexOf(b));
+  if(!EFFORT_RANK.includes(current))return modelDefault && effortIds.includes(modelDefault)?modelDefault:effortIds[0];
+  return ranked.filter(id=>EFFORT_RANK.indexOf(id)<=EFFORT_RANK.indexOf(current)).at(-1) ?? ranked[0] ?? effortIds[0];
+}
+
 /** Per-draft selection. Reading readiness or choosing here never writes global
  * settings or changes the binding of an existing chat. */
 export function NewChatProviderSelector({value,runtime,disabled,onChange}:{value?:DraftProviderSelection;runtime:RuntimeStatus|null;disabled:boolean;onChange:(value:DraftProviderSelection)=>void}){
@@ -26,6 +37,12 @@ export function NewChatProviderSelector({value,runtime,disabled,onChange}:{value
   // Older catalogs can omit optional capability arrays. Missing metadata must
   // hide unsupported controls, not crash when returning to the new-chat draft.
   const effortIds=Array.isArray(model?.effortIds)?model.effortIds:[], serviceTierIds=Array.isArray(model?.serviceTierIds)?model.serviceTierIds:[];
+  // A level saved for another model (xhigh for a model that offers up to
+  // high) must not stay selected as "unsupported": a factory build inherited
+  // it and stopped for an approval (observed 2026-11-15). Pick the nearest
+  // offered level once the model's capabilities are known.
+  const offeredEffort=model && effortIds.length?supportedEffort(effortIds,selection.effortId,model.defaultEffortId):selection.effortId;
+  useEffect(()=>{if(!disabled && model && offeredEffort && offeredEffort!==selection.effortId)onChange({...selection,effortId:offeredEffort});},[disabled,model,offeredEffort,selection,onChange]);
   return <div className="new-chat-provider-selector" aria-label="New chat provider settings">
     <label>Provider<select aria-label="New chat provider" value={connectorId} disabled={disabled || !settings || !checked} onChange={event=>{const next=event.currentTarget.value as ProviderConnectorId;if(!ready.includes(next) || !settings)return;const preset=settings.providerPresets[next];onChange({connectorId:next,...(preset.modelId?{modelId:preset.modelId}:{}),effortId:preset.reasoningEffort});}}>
       {!ready.includes(connectorId)?<option value={connectorId} disabled>{PROVIDER_LABELS[connectorId]} · {checked?'not ready':'checking'}</option>:null}{ready.map(id=><option key={id} value={id}>{PROVIDER_LABELS[id]}</option>)}

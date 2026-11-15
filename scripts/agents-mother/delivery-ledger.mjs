@@ -599,6 +599,31 @@ export function deliveryUsageStatus(budget) {
   return budget.unaccounted_attempts?.length ? "unknown" : "complete";
 }
 
+/**
+ * Evidence for a budget decision: the latest builder turns all ended before
+ * finishing, and the same failing checks came back after each verification.
+ * It is advice, never a gate. An interrupted turn can still leave a working
+ * product (verify-only exists for that), and some builds recover after such a
+ * streak. It exists because three extensions in a row bought one more
+ * unfinished turn each, with unchanged failures (observed 2026-11-15).
+ */
+export function deliveryProgressStall(state) {
+  const turns = (state?.budget?.accounted_turns || []).filter(turn => turn?.phase === "build-executor");
+  let unfinished = 0;
+  for (let index = turns.length - 1; index >= 0 && turns[index].turn_status === "interrupted"; index--) unfinished++;
+  const signature = typeof state?.consecutive_failure_signature === "string" ? state.consecutive_failure_signature : null;
+  const repeated = signature ? (state.failure_history || []).filter(row => row?.signature === signature).length : 0;
+  if (unfinished < 2 || repeated < 3) return null;
+  const recent = turns.slice(-unfinished);
+  const tokens = recent.reduce((total, turn) => total + (Number.isSafeInteger(turn.tokens_used) ? turn.tokens_used : 0), 0);
+  return {
+    unfinishedTurns: unfinished,
+    repeatedFailures: repeated,
+    unfinishedTurnTokens: tokens,
+    builderModels: [...new Set(recent.map(turn => turn.model_observed || turn.model_requested).filter(model => typeof model === "string" && model))],
+  };
+}
+
 export function deliveryTokenPreflight(budget) {
   const reserved = (budget.unaccounted_attempts || []).reduce((total, entry) => total + (Number.isSafeInteger(entry.reserved_tokens) ? entry.reserved_tokens : 0), 0);
   return {

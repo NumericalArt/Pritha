@@ -258,6 +258,42 @@ live verification against the selected paid model; and the approval lifetime
 of read-only commands. The native Codex chat keeps its earlier presentation of
 a running marker.
 
+## Builder effort and stalled builds (2026-11-15)
+
+An external UI test built three agents at once, one per transport. Codex and
+Claude Code produced working agents on their first iteration. The NeuralDeep
+chat ran on `gpt-oss-120b`, and two problems appeared:
+
+- **Effort.** The chat kept `xhigh` from the NeuralDeep preset, which was saved
+  for another model. The build inherited that value, which `gpt-oss-120b` does
+  not document, and stopped for a separate `configure_build` approval. Now an
+  inherited level that a NeuralDeep builder does not document becomes the
+  strongest documented level that does not exceed it, or the lowest one if none
+  does. An explicit `configure_build` decision still overrides this. The new
+  chat selector applies the same rule once the model's levels are known, so the
+  draft no longer shows a level marked "unsupported".
+- **Stalled build.** None of the six builder turns finished. Four ended when the
+  turn's token reservation ran out and two when the model called a tool that
+  does not exist. The same two checks failed after every verification. Three
+  approved extensions of 200,000 tokens each bought one more unfinished turn
+  apiece. Now, when the latest two or more builder turns were interrupted and
+  the latest failure has repeated at least three times, two things happen:
+  - factory status gives the model this evidence at the budget decision,
+    together with the instruction to tell the user before suggesting more
+    budget;
+  - the budget card shows the same facts: how many turns, which models, how
+    many tokens and how many repeated failures.
+
+  On NeuralDeep, Pritha offers `configure_build_model` for the same run. That
+  is still the user's decision.
+
+This is evidence, not a gate. Builds that later succeeded have had the same
+streak (an interrupted turn can still leave working code; verify-only exists
+for that). The user keeps every option, including more budget.
+
+Still open: when the builder calls an unavailable tool, its turn still ends,
+and work continues only on the next iteration.
+
 ## Verification
 
 The isolated Task Chat regression exercises all three builders with synthetic

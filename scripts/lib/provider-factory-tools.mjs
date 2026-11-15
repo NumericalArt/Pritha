@@ -28,7 +28,7 @@ import {declaredAgentPorts,suggestAgentPort} from '../agents-mother/agent-ports.
 import {factoryDraftRepair} from '../agents-mother/factory-draft-repair.mjs';
 import {proposalRevisionAvailable} from '../agents-mother/factory-proposal-revision.mjs';
 import {PRODUCT_PROPOSAL_SCHEMA,FactoryProductProposalError,validateProductProposal,compileProductProposal} from '../agents-mother/factory-product-proposal.mjs';
-import {deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker,deliveryUsageSettlement} from '../agents-mother/delivery-ledger.mjs';
+import {deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker,deliveryUsageSettlement,deliveryProgressStall} from '../agents-mother/delivery-ledger.mjs';
 
 const actions=['status','read_artifact','propose','improve','continue','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
 const readonly=new Set(['status','read_artifact','scaffold_plan']);
@@ -326,6 +326,14 @@ export class ProviderFactoryTools {
           ?'If the user asks to change how it behaves, call factory_improve with the COMPLETE revised product examples (the factory_propose.product format: every example the agent must still satisfy plus the changed and added ones) and a short note. factory_status.revisionBase holds the applied version\'s examples and the numbered functions to start from. Do not resend brief or limits and do not call propose, scaffold or deliver: the accepted Contract stays as it is. The host prepares the revised Outcome and verifier, builds on the applied version and replaces it only after the revision is verified. A change of name, interfaces, port, model or limits is not a revision; say so plainly and offer a new agent.'
           :why+' Do not call propose, scaffold or deliver for it and do not edit its documents or project. If the user asks for a change, say this plainly.')};
     }
+    // A budget pause after a streak of unfinished builder turns that left the
+    // same failures. Say so before anyone pays for more of the same: three
+    // extensions in a row bought one more unfinished turn each (2026-11-15).
+    const stall=plan.reason==='delivery_decision' && ['token_budget_exhausted','iteration_budget_exhausted'].includes(ledger?.blockers?.[0]?.code)?deliveryProgressStall(ledger):null;
+    if(stall)return {owner:'user',reason:plan.reason,progressStall:stall,
+      hint:'The last '+stall.unfinishedTurns+' builder turns ended before finishing, and the same checks failed after '+stall.repeatedFailures+' verifications. Tell the user this plainly before suggesting more budget: so far more budget has bought more unfinished turns. '
+        +(this.options.connectorId==='neuraldeep'?'A stronger tool-capable builder model is more likely to help: offer configure_build_model for this same run; the user approves it, and the documents, verifier and recorded usage stay as they are. ':'')
+        +'Other options are verify-only, reviewing the evidence or stopping the run. Request delivery_extend only if the user still chooses it.'};
     return {owner:['contract_decision','outcome_decision','manual_acceptance','delivery_decision'].includes(plan.reason)?'user':'pritha',reason:plan.reason};
   }
   planContinuation({shadow=false}={}){
@@ -473,6 +481,8 @@ export class ProviderFactoryTools {
       if(current.budget.max_tokens+additions.tokens<=current.budget.tokens_used || current.budget.max_iterations+additions.iterations<=current.iteration
         || (!additions.elapsed_ms && Date.now()-Date.parse(current.created_at)>=current.budget.max_elapsed_ms))throw factoryFail('factory_budget_insufficient');
       budgetReview={sharedLimits:{tokens:shared.maxTokens+additions.tokens,activeMs:shared.maxActiveMs+additions.elapsed_ms},proposedLimits:{tokens:current.budget.max_tokens+additions.tokens,iterations:current.budget.max_iterations+additions.iterations,freshWindowMs:additions.elapsed_ms},runId:state.runId,expectedVersion:current.version,tokensUsed:current.budget.tokens_used,iterationsUsed:current.iteration,additions,previousLimits:{tokens:current.budget.max_tokens,iterations:current.budget.max_iterations,elapsedMs:current.budget.max_elapsed_ms},approvalScope:'exact additions to the build and shared workflow limits and immediate continuation only; previous usage and accepted artifacts remain unchanged'};
+      // The person paying for more turns sees whether the previous ones finished.
+      const progress=deliveryProgressStall(current);if(progress)budgetReview.progress=progress;
     }
     const reviewKind=input.action==='approve_contract'?'contract':input.action==='approve_outcome'?'outcome':null;
     const review=reviewKind?factoryArtifact(p,state,reviewKind):null;

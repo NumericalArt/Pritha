@@ -68,12 +68,22 @@ export function readFactoryConversation(options){
   return validateVoiceFactory(p,value,{chatId:value.chatId,connectorId:value.connectorId});
 }
 export const FACTORY_BUILD_EFFORTS=Object.freeze(['none','minimal','low','medium','high','xhigh','max','ultra','default']);
+const EFFORT_RANK=['none','minimal','low','medium','high','xhigh','max','ultra'];
 export function inheritedFactoryBuildEffort(connectorId,modelId,requested){
   // Native NeuralDeep preparation omits unsupported/ignored effort controls.
   // Inherit that same provider-default behavior for the builder, rather than a
   // raw selector value from another model. Explicit build decisions are separate.
-  if(connectorId==='neuraldeep' && neuralDeepExecutionProfile(modelId).effortControl!=='documented')return 'none';
-  return requested;
+  if(connectorId!=='neuraldeep')return requested;
+  const profile=neuralDeepExecutionProfile(modelId);
+  if(profile.effortControl!=='documented')return 'none';
+  // A chat can carry a level this builder does not document, such as xhigh
+  // kept from another model's preset. Use the strongest documented level that
+  // does not exceed it (the lowest one if none does), so a routine mismatch
+  // never stops the build for an approval (observed 2026-11-15). An explicit
+  // configure_build decision still overrides this inheritance.
+  if(profile.supportedEfforts.includes(requested) || !EFFORT_RANK.includes(requested))return requested;
+  const ranked=profile.supportedEfforts.filter(effort=>EFFORT_RANK.includes(effort)).sort((a,b)=>EFFORT_RANK.indexOf(a)-EFFORT_RANK.indexOf(b));
+  return ranked.filter(effort=>EFFORT_RANK.indexOf(effort)<=EFFORT_RANK.indexOf(requested)).at(-1) ?? ranked[0] ?? requested;
 }
 export function validateFactoryBuildEffort(connectorId,modelId,effort){
   if(!FACTORY_BUILD_EFFORTS.includes(effort))throw factoryFail('factory_input_invalid');

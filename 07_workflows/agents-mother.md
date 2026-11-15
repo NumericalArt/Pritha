@@ -960,6 +960,16 @@ decision of 2026-11-15); a reviewed or custom build pauses and offers it as
 `count-reserved`, which needs the user's approval. Document, research and scaffold steps are
 not released this way.
 
+A NeuralDeep builder never inherits an effort it does not document. The chat's
+level becomes the strongest documented level that does not exceed it, so a
+preset saved for another model never stops the build for an approval.
+
+Sometimes the latest builder turns ended before finishing and the same checks
+failed again. At the next budget pause, factory status and the budget card both
+say so. Pritha then tells the user before suggesting more budget. On NeuralDeep
+she offers `configure_build_model`, which runs the same build with a stronger
+builder model. All options, including more budget, remain the user's decision.
+
 After the build, `factory_improve` changes how the agent behaves until the user
 accepts it. It takes the complete revised product examples and a short note;
 the accepted Contract, and with it the name, interfaces, port, model connection

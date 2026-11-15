@@ -138,9 +138,12 @@ test('factory mode can be disabled after capabilities change and an unsupported 
 for(const connectorId of ['codex','neuraldeep'])test(`new agent intent survives provider selection for ${connectorId}`,async({page})=>{
   const f=await fixture(page,false,true,true);await page.goto('/task-chat');await newDraft(page);
   await page.getByLabel('New chat provider',{exact:true}).selectOption(connectorId);
+  // The NeuralDeep preset says xhigh; this model offers medium and high, so the draft uses high.
+  await expect(page.getByLabel('New chat reasoning',{exact:true})).toHaveValue(connectorId==='neuraldeep'?'high':'medium');
   await page.getByLabel('Create new agent',{exact:true}).check();await page.getByLabel('New agent slug').fill('provider-counter');
   await page.locator('.codex-composer textarea').fill('Create a separate local counter agent.');await page.getByRole('button',{name:'Send',exact:true}).click();
   await expect.poll(()=>f.requests.length).toBe(1);const body=f.requests[0].body;
   expect(body.connectorId).toBe(connectorId);expect(body.factoryIntent).toEqual({action:'create-new-agent',slug:'provider-counter'});expect(body.workspace).toEqual({mode:'read-only'});
+  expect(body.initialTurn.settings.effortId).toBe(connectorId==='neuraldeep'?'high':'medium');
   expect(body.subject).toBeUndefined();await f.finish(0,'chat_'+connectorId+'_factory');
 });

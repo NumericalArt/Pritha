@@ -25,3 +25,31 @@ for(const [connectorId,modelId] of [['claude','claude-sonnet-5-5'],['neuraldeep'
   await expect.poll(()=>answers.length).toBe(1);expect(answers[0]).toMatchObject({requestId:'exact_request_001',revision:7,decision:'accept'});expect(answers[0].clientMessageId).toBeTruthy();
   await expect(page.getByText('Approval needed',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+// Three budget extensions in a row once bought one more unfinished builder turn
+// each (2026-11-15). The card says so before the user pays for another.
+for(const width of [1440,390])test(`a budget card shows that earlier builder turns did not finish at ${width}px`,async({page})=>{
+  await page.setViewportSize({width,height:900});
+  const now=new Date().toISOString(),chat='chat_neuraldeep_budget_fixture',providerId='neuraldeep_runtime',modelId='gpt-oss-120b';
+  const thread={chatId:chat,title:'Budget fixture',preview:'',group:'my_chats',origin:'chat',status:'active',activeFlags:['waiting_on_approval'],taskLinks:[],pinned:false,archived:false,historyKind:'mirrored',createdAt:now,updatedAt:now,runtime:{connectorId:'neuraldeep',modelId,providerId,protocol:'exec_resume',compatibility:'bound'},continuationState:'blocked_active_turn'};
+  const budgetReview={tokensUsed:889243,iterationsUsed:6,additions:{tokens:200000,iterations:0,elapsed_ms:0},proposedLimits:{tokens:1200000,iterations:24},progress:{unfinishedTurns:4,repeatedFailures:5,unfinishedTurnTokens:600000,builderModels:[modelId]}};
+  const request={requestId:'budget_request_001',chatId:chat,turnId:'budget_turn_001',kind:'command_approval',title:'Approval needed',presentation:{state:'pending',revision:3,budgetReview}};
+  await page.route('**/api/codex-chat/v1/**',async route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname.endsWith('/events'))return route.fulfill({contentType:'text/event-stream',body:': ready\n\n'});
+    const data=url.pathname.endsWith('/runtime')?{connectorId:'neuraldeep',preferredProvider:providerId,effectiveProvider:providerId,availability:'ready',providers:[{providerId,availability:'ready',capabilities:{fullChat:true,steerTurn:false,interruptTurn:true,commandApprovals:true,fileChangeApprovals:true}}],models:[{id:modelId}],selected:{modelId,sandboxMode:'workspace_write',approvalMode:'on_request'}}
+      :url.pathname.endsWith('/threads')?{data:[thread],nextCursor:null}
+      :url.pathname.endsWith('/activity')?{cursor:0,changed:[]}
+      :url.pathname.endsWith('/history')?{data:[],hasOlder:false,olderCursor:null}
+      :url.pathname.endsWith('/delivery')?{runs:[]}
+      :{thread,activeTurnId:'budget_turn_001',controls:{turnId:'budget_turn_001',steer:false,interrupt:true},pendingRequests:[request],queued:[],streamUrl:`/api/codex-chat/v1/threads/${chat}/events`,continuationState:'blocked_active_turn',history:{state:'available'}};
+    await route.fulfill({json:{apiVersion:'1',requestId:'fixture_response',data}});
+  });
+  await page.goto('/task-chat?group=my_chats&chat='+chat);
+  await expect(page.getByText('Increase the limit and continue building?',{exact:true})).toBeVisible();
+  const stall=page.getByTestId('build-progress-stall');
+  await expect(stall).toContainText('the last 4 builder turns (gpt-oss-120b) used 600,000 tokens and ended before finishing');
+  await expect(stall).toContainText('the same checks failed after 5 verifications');
+  await expect(page.getByRole('button',{name:'Approve this request',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

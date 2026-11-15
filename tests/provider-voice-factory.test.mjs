@@ -20,7 +20,7 @@ import {listenProviderToolServer} from '../scripts/lib/provider-tool-server.mjs'
 import {contractData} from '../scripts/agents-mother/contract.mjs';
 import {validateOutcomeSpecText} from '../scripts/agents-mother/outcome-spec.mjs';
 import {preparedTrialInputFiles} from '../scripts/agents-mother/prepared-trial-inputs.mjs';
-import {createDeliveryLedger,updateDeliveryLedger,readDeliveryLedger,budgetBlocker,accountDeliveryExecutorResult} from '../scripts/agents-mother/delivery-ledger.mjs';
+import {createDeliveryLedger,updateDeliveryLedger,readDeliveryLedger,budgetBlocker,accountDeliveryExecutorResult,deliveryProgressStall} from '../scripts/agents-mother/delivery-ledger.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const brief={identity:{name:'Voice Built',slug:'voice-built'},goal:'Read a supplied text file and count its lines.',user:'The local operator',successCriteria:['The CLI returns the exact line count and handles a missing file with an error.'],coreFunctions:['Count lines in a supplied local file'],workflows:['Choose a file; run the CLI; inspect its count'],nonGoals:['No network, deployment or automatic services'],permissions:{network:['none'],filesystem:['Only the operator-selected file and child workspace']},technical:{runtimeFamily:'cli',primaryInterface:'CLI',serviceMode:'none',repositoryResearchPolicy:'not-applicable',repositoryAdoptionMode:'none',repositoryResearchWaiverReason:'A deterministic local line counter needs no third-party repository.'}};
@@ -282,6 +282,12 @@ test('NeuralDeep build effort repair validates support before any provider reque
   assert.equal(inheritedFactoryBuildEffort('neuraldeep','kimi-k3.1-pro','xhigh'),'none');
   assert.equal(inheritedFactoryBuildEffort('neuraldeep','qwen3.8-27b','xhigh'),'none');
   assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','high'),'high');
+  // A level kept from another model's preset becomes the nearest documented one, not an approval.
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','xhigh'),'high');
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','max'),'high');
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','minimal'),'low');
+  assert.equal(inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','default'),'default');
+  assert.doesNotThrow(()=>validateFactoryBuildEffort('neuraldeep','gpt-oss-120b',inheritedFactoryBuildEffort('neuraldeep','gpt-oss-120b','xhigh')));
   assert.equal(inheritedFactoryBuildEffort('codex','gpt-6-astra','xhigh'),'xhigh');
   assert.equal(inheritedFactoryBuildEffort('claude','claude-sonnet-5-5','high'),'high');
 });
@@ -401,6 +407,38 @@ test('a budget review is tied to the paused run and rechecks its version after t
   const result=await f.call('delivery_extend',arg);assert.equal(result.status,'failed');assert.match(result.text,/factory_budget_context_changed/);
   await assert.rejects(f.call('delivery_extend',arg),{code:'factory_budget_context_changed'});
   const after=readDeliveryLedger(runRoot);assert.equal(changes,1);assert.deepEqual(after.budget,blocked.budget);assert.equal(after.run_id,runId);
+});
+test('a finished builder turn or a changed failure ends the stall evidence',()=>{
+  const turns=statuses=>statuses.map((turn_status,index)=>({phase:'build-executor',turn_status,tokens_used:100,model_observed:index%2?'model-b':'model-a'}));
+  const history=(signature,count)=>Array.from({length:count},(_,iteration)=>({iteration,signature}));
+  const state=(statuses,signature='sha256:a',count=3)=>({budget:{accounted_turns:turns(statuses)},consecutive_failure_signature:signature,failure_history:history(signature,count)});
+  assert.deepEqual(deliveryProgressStall(state(['completed','interrupted','interrupted'])),{unfinishedTurns:2,repeatedFailures:3,unfinishedTurnTokens:200,builderModels:['model-b','model-a']});
+  assert.equal(deliveryProgressStall(state(['interrupted','interrupted','completed'])),null,'the latest turn finished');
+  assert.equal(deliveryProgressStall(state(['interrupted','interrupted'],'sha256:a',2)),null,'the same failure only twice');
+  assert.equal(deliveryProgressStall({...state(['interrupted','interrupted']),failure_history:history('sha256:b',3)}),null,'the latest failure differs');
+  assert.equal(deliveryProgressStall({}),null);
+});
+test('a budget decision says when earlier builder turns did not finish and the same checks kept failing',async t=>{
+  const f=fixture(t,'neuraldeep');await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const spec=f.artifact('outcome').frontmatter,runId='fixture-stalled-build',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);
+  createDeliveryLedger(runRoot,{runId,agentSlug:f.p.slug,targetKey:'fixture-target',sourceProject:f.p.target,budget:{maxTokens:8000,maxIterations:5},spec:{id:spec.id,semanticLock:spec.outcome_semantic_lock,documentLock:spec.outcome_document_lock,contractFingerprint:spec.contract_fingerprint,approvalId:'fixture-approval'}});
+  const turn=(n,turn_status)=>accountDeliveryExecutorResult(runRoot,{schema:'pritha-build-executor-result-v2',executor:'neuraldeep-build',run_id:runId,thread_id:'thread-'+n,turn_id:'turn-'+n,tokens_used:4000,usage_status:'measured',usage_source:'neuraldeep-host-response',usage_scope:'build-executor',goal_enforcement:'not-applicable',status:turn_status==='completed'?'completed':'failed',turn_status,model_requested:'gpt-oss-120b',model_observed:'gpt-oss-120b'},'executor/iteration-00'+n+'.json');
+  const signature='sha256:'+'a'.repeat(64),failures=count=>Array.from({length:count},(_,iteration)=>({iteration,signature,trial_ids:['product-http-cli']}));
+  const block=history=>updateDeliveryLedger(runRoot,current=>{const next={...current,iteration:2,consecutive_failure_signature:signature,consecutive_failure_count:history,failure_history:failures(history)};return {...next,status:'blocked',next_action:'',blockers:[budgetBlocker(next)]};}).state;
+  turn(1,'interrupted');turn(2,'interrupted');
+  // Two failures of the same checks are not yet a streak; three are.
+  let blocked=block(2);fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),runId,phase:'delivery-blocked',hostVerifiedIteration:2}));
+  assert.equal((await f.call('status')).nextStep.progressStall,undefined);
+  blocked=block(3);
+  const status=await f.call('status');
+  assert.equal(status.nextStep.owner,'user');assert.equal(status.nextStep.reason,'delivery_decision');
+  assert.deepEqual(status.nextStep.progressStall,{unfinishedTurns:2,repeatedFailures:3,unfinishedTurnTokens:8000,builderModels:['gpt-oss-120b']});
+  assert.match(status.nextStep.hint,/configure_build_model/);assert.match(status.nextStep.hint,/delivery_extend only if the user still chooses it/);
+  let presented;f.options.approve=async req=>{presented=req.presentation.budgetReview;return {decision:'decline'};};
+  assert.equal((await f.call('delivery_extend',{expected_version:blocked.version,add_tokens:2000})).status,'declined');
+  assert.deepEqual(presented.progress,status.nextStep.progressStall);
+  assert.equal(readDeliveryLedger(runRoot).budget.max_tokens,8000,'Showing the evidence changes no limit');
 });
 test('factory status observes actual acceptance without rewriting state or borrowing another run',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
