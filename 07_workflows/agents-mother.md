@@ -970,6 +970,17 @@ say so. Pritha then tells the user before suggesting more budget. On NeuralDeep
 she offers `configure_build_model`, which runs the same build with a stronger
 builder model. All options, including more budget, remain the user's decision.
 
+At a budget pause, factory status also lists the fields an extension must
+carry. For example, `add_elapsed_ms` is required once the run's time window
+has ended. A refused extension returns the same list. Nothing is requested
+until every required field is present, and Pritha does not report an
+extension before the tool confirms it.
+
+When a Trial whose verifier comes from a host template fails, the builder's
+failure list carries Pritha's description of what that verifier expects. For
+managed Stop, the description is in `scripts/agents-mother/host-trial-guidance.mjs`,
+and new API children get the same text in AGENTS.md.
+
 After the build, `factory_improve` changes how the agent behaves until the user
 accepts it. It takes the complete revised product examples and a short note;
 the accepted Contract, and with it the name, interfaces, port, model connection

@@ -8,6 +8,7 @@ import { contractData, validateContract, SERVICE_MODES } from "../scripts/agents
 import { scaffoldCapability } from "../scripts/agents-mother/scaffold/capabilities.mjs";
 import { apiProcessPortConfiguration } from "../scripts/agents-mother/scaffold/api-process.mjs";
 import { generatedAgentFiles } from "../scripts/agents-mother/scaffold/index.mjs";
+import { MANAGED_STOP_PROTOCOL, hostTrialGuidance } from "../scripts/agents-mother/host-trial-guidance.mjs";
 import { deriveExternalResearchTopics } from "../scripts/agents-mother/external-research-topics.mjs";
 
 const selected = { runtimeFamily: "api", primaryInterface: "web", secondaryInterfaces: "API", serviceMode: "process", autostart: "optional", proactiveMode: "none", telegramMode: "none", repositoryAdoptionMode: "none" };
@@ -87,6 +88,25 @@ test("API files preserve process contract, planned endpoints and non-running str
   const ephemeral = generatedAgentFiles({ ...data, memoryModel: "ephemeral", indexingSearchNeeds: "none; no SQLite/embeddings copied" });
   assert.equal(ephemeral.some(file => file.path.startsWith("memory/") || file.path === "scripts/memory-status.mjs"), false);
 
+});
+
+// Two builder models required the stop token in Stop's own environment for
+// seven iterations (2026-11-15); the verifier never supplies it there.
+test("the managed Stop guidance matches how the host verifier calls Stop and reaches a failing build", t => {
+  const f = fixture(t), agents = generatedAgentFiles(contractData(f.file)).find(file => file.path === "AGENTS.md").content;
+  assert.ok(agents.includes(MANAGED_STOP_PROTOCOL));
+  assert.match(MANAGED_STOP_PROTOCOL, /Stop never receives PRITHA_MANAGED_STOP_TOKEN and must not require it/);
+  const template = readFileSync("scripts/agents-mother/scaffold/templates/managed-stop-trial.mjs.tmpl", "utf8");
+  assert.match(template, /const env=\{PATH:process\.env\.PATH \|\| '',LANG:'C\.UTF-8',\[managedStop\.portVariable\]:String\(port\)\};/, "Stop runs with only PATH, LANG and the port");
+  assert.match(template, /start\(\['scripts\/server\.mjs','--managed-instance',instance\],\{\.\.\.env,PRITHA_MANAGED_STOP_TOKEN:token\}\)/, "only the server receives the token");
+  assert.equal((template.match(/PRITHA_MANAGED_STOP_TOKEN/g) || []).length, 1);
+  const stop = { id: "managed-stop", verifierInputs: [{ path: "verification/managed-stop.mjs", provenance: "host-template:api-managed-stop-v1" }] };
+  const own = { id: "own-check", verifierInputs: [{ path: "tests/own.mjs", provenance: "builder" }] };
+  const plan = { trials: [stop, own] };
+  assert.deepEqual(hostTrialGuidance(plan, [{ id: "managed-stop", status: "failed" }, { id: "own-check", status: "failed" }]),
+    [{ id: "managed-stop-host-protocol", status: "feedback", message: MANAGED_STOP_PROTOCOL }]);
+  assert.deepEqual(hostTrialGuidance(plan, [{ id: "own-check", status: "failed" }]), []);
+  assert.deepEqual(hostTrialGuidance(plan, []), []);
 });
 
 test("API scaffold CLI preserves acceptance/research gates then makes a clean baseline and truthful report", t => {

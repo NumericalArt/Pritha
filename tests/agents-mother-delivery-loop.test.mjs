@@ -17,6 +17,8 @@ import {
 } from "../scripts/agents-mother/delivery-loop.mjs";
 import { TRIAL_PLAN_SCHEMA } from "../scripts/agents-mother/outcome-spec.mjs";
 import { deliveryExplanation } from "../scripts/agents-mother/delivery-explanation.mjs";
+import { MANAGED_STOP_PROTOCOL } from "../scripts/agents-mother/host-trial-guidance.mjs";
+import { createHash } from "node:crypto";
 
 function git(cwd, args) {
   return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -114,6 +116,25 @@ test("delivery loop repairs a failing fixture, independently verifies, commits a
   const probes = readDeliveryLedger(runRoot).runtime_probes;
   assert.equal(probes.some((entry) => entry.kind === "trial-execution" && entry.command_exec === true), true);
   assert.equal(probes.some((entry) => entry.kind === "build-executor" && entry.available === true), true);
+});
+
+test("a failing host-template verifier reaches the builder with Pritha's description of what it expects", async () => {
+  const project = repository();
+  const runRoot = path.join(mkdtempSync(path.join(os.tmpdir(), "pritha-loop-run-")), "builds", "fixture-agent", "run-host-protocol");
+  const hostPlan = plan();
+  hostPlan.trials[0].verifierInputs = [{ path: "eval.mjs", hash: "sha256:" + createHash("sha256").update(readFileSync(path.join(project, "eval.mjs"))).digest("hex"), provenance: "host-template:api-managed-stop-v1" }];
+  const seen = [];
+  const executor = new FunctionBuildExecutor(async ({ worktree, failures }) => {
+    seen.push(failures);
+    if (seen.length === 2) writeFileSync(path.join(worktree, "implementation.txt"), "ready\n", "utf8");
+    return { summary: "attempted" };
+  });
+  const result = await runDeliveryLoop({ plan: hostPlan, projectPath: project, runRoot, runId: "run-host-protocol", buildExecutor: executor,
+    trialBackend: "local", reportDir: false, budget: { maxIterations: 3, maxElapsedMs: 60_000, repeatedFailureThreshold: 3 } });
+  assert.equal(result.state.status, "verified");
+  const failed = seen.find(failures => failures.some(entry => entry.id === "main"));
+  assert.ok(failed, "a build turn saw the failing Trial");
+  assert.deepEqual(failed.filter(entry => entry.id === "main-host-protocol").map(entry => entry.message), [MANAGED_STOP_PROTOCOL]);
 });
 
 test("repeated non-progress becomes a typed blocker instead of hanging", async () => {

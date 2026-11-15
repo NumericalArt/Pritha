@@ -30,6 +30,20 @@ import {proposalRevisionAvailable} from '../agents-mother/factory-proposal-revis
 import {PRODUCT_PROPOSAL_SCHEMA,FactoryProductProposalError,validateProductProposal,compileProductProposal} from '../agents-mother/factory-product-proposal.mjs';
 import {deliveryBudgetExtensionAllowed,recordedDeliveryBudgetBlocker,deliveryUsageSettlement,deliveryProgressStall} from '../agents-mother/delivery-ledger.mjs';
 
+// Which fields a budget extension must carry for this ledger now. Status and
+// the delivery_extend check use the same answer, so the model is not refused
+// for a limit it could not see: on 2026-11-15 a lapsed time window rejected
+// three requests that added only tokens, with no word about time.
+function budgetExtensionNeeds(ledger,{tokenPause=false,additions={tokens:0,iterations:0,elapsed_ms:0},now=Date.now()}={}){
+  const budget=ledger.budget,endsAt=Date.parse(ledger.created_at)+budget.max_elapsed_ms,ended=Number.isFinite(endsAt) && now>=endsAt;
+  const requiredFields=[];
+  if(tokenPause && !additions.tokens || budget.max_tokens+additions.tokens<=budget.tokens_used)requiredFields.push('add_tokens');
+  if(budget.max_iterations+additions.iterations<=ledger.iteration)requiredFields.push('add_iterations');
+  if(ended && !additions.elapsed_ms)requiredFields.push('add_elapsed_ms');
+  return {requiredFields,tokensUsed:budget.tokens_used,tokenLimit:budget.max_tokens,iterationsUsed:ledger.iteration,iterationLimit:budget.max_iterations,
+    ...(Number.isFinite(endsAt)?{timeWindowEndsAt:new Date(endsAt).toISOString(),timeWindowEnded:ended}:{})};
+}
+
 const actions=['status','read_artifact','propose','improve','continue','init','write_draft','patch_draft','approve_contract','create_outcome','prepare_product_trial','approve_outcome','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','configure_build','configure_build_model','deliver','delivery_status','delivery_resume','delivery_extend','verify','finish'];
 const readonly=new Set(['status','read_artifact','scaffold_plan']);
 const workflowSteps=new Set(['propose','improve','continue','init','write_draft','patch_draft','create_outcome','prepare_product_trial','research','research_status','research_decide','research_collect','research_recover','research_apply','scaffold_plan','scaffold','scaffold_refresh','deliver','delivery_status','verify','finish']);
@@ -95,6 +109,10 @@ export function factoryBriefErrorDetail(error){
     return {error:error.code,...detail,hint:(detail.detail?'Correct the rule named in detail. ':'')+'For a new local API child resubmit the complete brief and product examples with factory_propose; the host prepares the Outcome, verifier, commands and port itself. A custom draft workflow instead uses prepare_product_trial with the exact draft Outcome hash and declarative HTTP/CLI requests and expected_json, then reads the resulting Outcome and verifier before its separate approval. Structural smoke alone cannot approve an API product.'};
   }
   if(error?.code==='factory_build_effort_unsupported')return {error:error.code,supportedEfforts:(error.supportedEfforts || []).filter(effort=>FACTORY_BUILD_EFFORTS.includes(effort)),hint:'Read factory_status.buildExecution and choose a supported effort with factory_configure_build. The provider, model, documents and budgets remain unchanged; operator approval is required.'};
+  if(error?.code==='factory_budget_insufficient' && error.budgetNeeds)return {error:error.code,...error.budgetNeeds,
+    hint:'No approval was requested and the limits are unchanged. Call factory_delivery_extend again with expected_version and every field in requiredFields set to a positive amount, keeping the amounts the user chose. '
+      +(error.budgetNeeds.timeWindowEnded?'The run time window has ended, so add_elapsed_ms is required: it opens a fresh window of that length when the user approves (3600000 is one hour). ':'')
+      +'Tell the user what is being requested; do not report the extension as done until the tool confirms it.'};
   // These messages come only from the host validator, never from provider text.
   const patchHints={factory_patch_invalid:'Use 1–8 literal from/to edits and the current artifact SHA-256. The host computes the result hash; expected_result_sha256 is optional. No draft was written.',factory_patch_not_unique:'Each from text must occur exactly once at its step; read the current draft and use a larger literal match. No draft was written.',factory_patch_hash_mismatch:'The edits do not produce the supplied optional result hash. Omit expected_result_sha256 to let the host compute it; retain the exact current expected_sha256. No draft was written.'};
   if(Object.hasOwn(patchHints,error?.code))return {error:error.code,hint:patchHints[error.code]};
@@ -329,11 +347,15 @@ export class ProviderFactoryTools {
     // A budget pause after a streak of unfinished builder turns that left the
     // same failures. Say so before anyone pays for more of the same: three
     // extensions in a row bought one more unfinished turn each (2026-11-15).
-    const stall=plan.reason==='delivery_decision' && ['token_budget_exhausted','iteration_budget_exhausted'].includes(ledger?.blockers?.[0]?.code)?deliveryProgressStall(ledger):null;
-    if(stall)return {owner:'user',reason:plan.reason,progressStall:stall,
+    const budgetPause=plan.reason==='delivery_decision' && ['token_budget_exhausted','iteration_budget_exhausted','elapsed_budget_exhausted'].includes(ledger?.blockers?.[0]?.code);
+    const extension=budgetPause?budgetExtensionNeeds(ledger,{tokenPause:ledger.blockers[0].code==='token_budget_exhausted'}):null;
+    const extensionHint=extension?'If the user chooses more budget, factory_delivery_extend needs expected_version and '+extension.requiredFields.join(', ')+(extension.timeWindowEnded?' (the run time window ended at '+extension.timeWindowEndsAt+', so time must be added too)':'')+'. ':'';
+    const stall=budgetPause && ledger.blockers[0].code!=='elapsed_budget_exhausted'?deliveryProgressStall(ledger):null;
+    if(stall)return {owner:'user',reason:plan.reason,progressStall:stall,budgetExtension:extension,
       hint:'The last '+stall.unfinishedTurns+' builder turns ended before finishing, and the same checks failed after '+stall.repeatedFailures+' verifications. Tell the user this plainly before suggesting more budget: so far more budget has bought more unfinished turns. '
         +(this.options.connectorId==='neuraldeep'?'A stronger tool-capable builder model is more likely to help: offer configure_build_model for this same run; the user approves it, and the documents, verifier and recorded usage stay as they are. ':'')
-        +'Other options are verify-only, reviewing the evidence or stopping the run. Request delivery_extend only if the user still chooses it.'};
+        +'Other options are verify-only, reviewing the evidence or stopping the run. Request delivery_extend only if the user still chooses it. '+extensionHint};
+    if(extension)return {owner:'user',reason:plan.reason,budgetExtension:extension,hint:extensionHint+'Ask the user before requesting it; the user approves the exact amounts.'};
     return {owner:['contract_decision','outcome_decision','manual_acceptance','delivery_decision'].includes(plan.reason)?'user':'pritha',reason:plan.reason};
   }
   planContinuation({shadow=false}={}){
@@ -477,9 +499,8 @@ export class ProviderFactoryTools {
       const shared=readFactoryBudget({...p,chatId:this.options.chatId,connectorId:this.options.connectorId});
       for(const [key,max] of [['tokens',10000000],['iterations',100],['elapsed_ms',86400000]])if(!Number.isSafeInteger(additions[key]) || additions[key]<0 || additions[key]>max)throw factoryFail('factory_input_invalid');
       if(!Object.values(additions).some(Boolean))throw factoryFail('factory_input_invalid');
-      if(!additions.tokens && recordedDeliveryBudgetBlocker(delivery.runRoot,current))throw factoryFail('factory_budget_insufficient');
-      if(current.budget.max_tokens+additions.tokens<=current.budget.tokens_used || current.budget.max_iterations+additions.iterations<=current.iteration
-        || (!additions.elapsed_ms && Date.now()-Date.parse(current.created_at)>=current.budget.max_elapsed_ms))throw factoryFail('factory_budget_insufficient');
+      const needs=budgetExtensionNeeds(current,{tokenPause:recordedDeliveryBudgetBlocker(delivery.runRoot,current)!==null,additions});
+      if(needs.requiredFields.length)throw Object.assign(factoryFail('factory_budget_insufficient'),{budgetNeeds:needs});
       budgetReview={sharedLimits:{tokens:shared.maxTokens+additions.tokens,activeMs:shared.maxActiveMs+additions.elapsed_ms},proposedLimits:{tokens:current.budget.max_tokens+additions.tokens,iterations:current.budget.max_iterations+additions.iterations,freshWindowMs:additions.elapsed_ms},runId:state.runId,expectedVersion:current.version,tokensUsed:current.budget.tokens_used,iterationsUsed:current.iteration,additions,previousLimits:{tokens:current.budget.max_tokens,iterations:current.budget.max_iterations,elapsedMs:current.budget.max_elapsed_ms},approvalScope:'exact additions to the build and shared workflow limits and immediate continuation only; previous usage and accepted artifacts remain unchanged'};
       // The person paying for more turns sees whether the previous ones finished.
       const progress=deliveryProgressStall(current);if(progress)budgetReview.progress=progress;

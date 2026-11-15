@@ -440,6 +440,33 @@ test('a budget decision says when earlier builder turns did not finish and the s
   assert.deepEqual(presented.progress,status.nextStep.progressStall);
   assert.equal(readDeliveryLedger(runRoot).budget.max_tokens,8000,'Showing the evidence changes no limit');
 });
+// A lapsed time window once refused three token-only requests with a bare
+// code, and the chat model reported each as done (2026-11-15).
+test('a budget request after the time window ended is told to add time, before and after it is refused',async t=>{
+  const f=fixture(t,'neuraldeep');await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});
+  await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
+  const spec=f.artifact('outcome').frontmatter,runId='fixture-lapsed-window',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);
+  createDeliveryLedger(runRoot,{runId,agentSlug:f.p.slug,targetKey:'fixture-target',sourceProject:f.p.target,budget:{maxTokens:10000,maxIterations:5,maxElapsedMs:1},spec:{id:spec.id,semanticLock:spec.outcome_semantic_lock,documentLock:spec.outcome_document_lock,contractFingerprint:spec.contract_fingerprint,approvalId:'fixture-approval'}});
+  accountDeliveryExecutorResult(runRoot,{schema:'pritha-build-executor-result-v2',executor:'neuraldeep-build',run_id:runId,thread_id:'thread-1',turn_id:'turn-1',tokens_used:120,usage_status:'measured',usage_source:'neuraldeep-host-response',usage_scope:'build-executor',goal_enforcement:'not-applicable'},'executor/iteration-001.json');
+  await new Promise(resolve=>setTimeout(resolve,5));
+  const blocked=updateDeliveryLedger(runRoot,current=>{const next={...current,iteration:1};return {...next,status:'blocked',next_action:'',blockers:[budgetBlocker(next)]};}).state;
+  assert.equal(blocked.blockers[0].code,'elapsed_budget_exhausted');
+  fs.writeFileSync(f.p.file,JSON.stringify({...f.state(),runId,phase:'delivery-blocked',hostVerifiedIteration:1}));
+  const status=await f.call('status');
+  assert.deepEqual(status.nextStep.budgetExtension.requiredFields,['add_elapsed_ms']);
+  assert.equal(status.nextStep.budgetExtension.timeWindowEnded,true);
+  assert.match(status.nextStep.hint,/expected_version and add_elapsed_ms \(the run time window ended at /);
+  const count=f.approvals.length;
+  const refused=await f.call('delivery_extend',{expected_version:blocked.version,add_tokens:2000}).catch(error=>error);
+  assert.equal(refused.code,'factory_budget_insufficient');assert.equal(f.approvals.length,count,'A refused request asks the user nothing');
+  const detail=factoryBriefErrorDetail(refused);
+  assert.deepEqual(detail.requiredFields,['add_elapsed_ms']);assert.equal(detail.timeWindowEnded,true);
+  assert.match(detail.hint,/add_elapsed_ms is required/);assert.match(detail.hint,/do not report the extension as done/);
+  let presented;f.options.approve=async req=>{presented=req.presentation.budgetReview;return {decision:'decline'};};
+  assert.equal((await f.call('delivery_extend',{expected_version:blocked.version,add_tokens:2000,add_elapsed_ms:60000})).status,'declined');
+  assert.deepEqual(presented.additions,{tokens:2000,iterations:0,elapsed_ms:60000});
+  assert.deepEqual(readDeliveryLedger(runRoot).budget.max_elapsed_ms,1,'A declined request changes no limit');
+});
 test('factory status observes actual acceptance without rewriting state or borrowing another run',{timeout:60000},async t=>{
   const f=fixture(t);await f.ok('init',{brief,build_token_budget:10000});await f.ok('approve_contract',{expected_sha256:f.artifact('contract').sha256});await f.ok('create_outcome');await f.ok('approve_outcome',{expected_sha256:f.artifact('outcome').sha256});
   const spec=f.artifact('outcome').frontmatter,runId='run-factory-status',runRoot=path.join(f.p.stateRoot,'builds',f.p.slug,runId);

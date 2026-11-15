@@ -48,6 +48,7 @@ import {
 } from "./delivery-worktree.mjs";
 import { compileOutcomeSpec, TRIAL_PLAN_SCHEMA, verifyCompiledTrialPlan, verifyOutcomeApproval } from "./outcome-spec.mjs";
 import { runTrialPlan, verifyTrialResultFreshness } from "./trial-runner.mjs";
+import { hostTrialGuidance } from "./host-trial-guidance.mjs";
 
 export class DeliveryLoopError extends Error {
   constructor(code, message, details = {}) {
@@ -901,7 +902,7 @@ async function runDeliveryLoopLocked(input = {}) {
           remainingIterations: Math.max(0, state.budget.max_iterations - state.iteration),
           worktree: worktree.worktree,
           plan,
-          failures: sanitize([...(state.consecutive_failure_count>=state.budget.repeated_failure_threshold && plan.delivery_policy?.repair_policy==="model-led"?[{id:"repair-strategy",status:"feedback",message:"The same checks still fail. Review the observed diagnostics, identify the faulty assumption and change the implementation approach. Do not weaken tests or ask the user to debug. The remaining time, tokens and iteration budget still apply."}]:[]),...failures], { projectRoot: worktree.worktree, stateRoot: input.stateRoot, root: input.root }),
+          failures: sanitize([...(state.consecutive_failure_count>=state.budget.repeated_failure_threshold && plan.delivery_policy?.repair_policy==="model-led"?[{id:"repair-strategy",status:"feedback",message:"The same checks still fail. Review the observed diagnostics, identify the faulty assumption and change the implementation approach. Do not weaken tests or ask the user to debug. The remaining time, tokens and iteration budget still apply."}]:[]),...hostTrialGuidance(plan,failures),...failures], { projectRoot: worktree.worktree, stateRoot: input.stateRoot, root: input.root }),
           protectedPaths: protectedInputs.entries,
           timeoutMs: Math.min(input.executorTimeoutMs || 900000,remainingElapsedMs),
           stateRoot: input.stateRoot,

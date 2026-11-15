@@ -1,6 +1,7 @@
 import { redactSensitiveText } from "../../lib/redaction.mjs";
 import { slug } from "../../lib/slug.mjs";
 import { today } from "../../lib/date.mjs";
+import { MANAGED_STOP_PROTOCOL } from "../host-trial-guidance.mjs";
 
 const text = value => redactSensitiveText(String(value || "")).replace(/[\r\n]+/g, " ").slice(0, 2000);
 const json = value => `${JSON.stringify(value, null, 2)}\n`;
@@ -50,7 +51,7 @@ export function apiProcessFiles(baseFiles, data, capability, selected) {
   const markdown = (id, body) => `---\nid: ${agentSlug}-${id}\ntype: workflow\nstatus: draft\ncreated: ${today()}\nupdated: ${today()}\ntopics: [agent, api, process-service]\ntools: [Node.js]\nsources: [delivery/outcome-lineage.json]\nrelated: {}\nsupersedes: []\nsuperseded_by: []\n---\n\n${body}\n`;
   const pending = 'console.error(JSON.stringify({status:"implementation-required",message:"Implement the approved Outcome before starting a service."}));\nprocess.exitCode=78;\n';
   const cli = capability.interfaces.includes("cli");
-  const managedProtocol = '## Managed process verification\n\nThe independent managed Stop Trial launches scripts/server.mjs with --managed-instance UUID on an ephemeral port. GET /health must return that instance_id. The private per-launch PRITHA_MANAGED_STOP_TOKEN can authenticate a server-side stop request; keep it in the mode-0600 record as stop_token and never expose it in health. Validate PID, instance, token and project ownership. A recorded PID alone never authorizes a destructive signal. Reject corrupted or foreign records without deleting them; missing records and repeated Stop are successful. Preserve unrelated .state files. Update operations/manifest.json from implementation-required only after implementing the managed commands. The host verifies these obligations independently before handing off the agent.';
+  const managedProtocol = '## Managed process verification\n\n' + MANAGED_STOP_PROTOCOL + '\n\nUpdate operations/manifest.json from implementation-required only after implementing the managed commands. The host verifies these obligations independently before handing off the agent.';
   const cliEntrypoint = data.cliEntrypoint || 'scripts/agent-cli.mjs';
   const smoke = `import assert from "node:assert/strict";
 import { lstatSync, readFileSync } from "node:fs";

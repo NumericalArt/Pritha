@@ -294,6 +294,40 @@ for that). The user keeps every option, including more budget.
 Still open: when the builder calls an unavailable tool, its turn still ends,
 and work continues only on the next iteration.
 
+## Managed Stop guidance and budget refusals (2026-11-15)
+
+The same NeuralDeep build continued with `kimi-k3.1-pro` as its builder. In one
+turn, kimi fixed the product check that `gpt-oss-120b` had failed six times.
+The managed Stop check still failed: both models made Stop require
+`PRITHA_MANAGED_STOP_TOKEN` in its own environment. The host verifier never
+supplies it there. Stop has to read the token from its record and present it
+to the server. The old AGENTS.md text said the token "can authenticate" a stop
+request and asked to "validate" it, which both models read the same wrong way.
+
+- **One description, two readers.** `host-trial-guidance.mjs` holds what the
+  managed Stop verifier does and expects, case by case. New API children get it
+  in AGENTS.md. When a Trial whose verifier comes from that host template
+  fails, the delivery loop adds the same text to the builder's failure list.
+  This also reaches runs scaffolded before the change. A test pins the
+  description to the verifier template: if the template ever passes the token
+  to Stop, the test fails and the text must change with it. On a copy of the
+  stalled build, removing the environment-token check alone passed all nine
+  Stop cases.
+- **Budget refusals name what is missing.** The run's time window had ended,
+  so every extension needed `add_elapsed_ms`. The chat model sent only
+  `add_tokens` three times and got back a bare `factory_budget_insufficient`.
+  Twice it then told the user the budget had grown. Now status at a budget
+  decision lists the fields an extension must carry and when the time window
+  ends. A refusal returns the same list with a hint to resend every required
+  field and not to report the extension as done before the tool confirms it.
+  Status and the refusal use one function, so they cannot disagree.
+
+The Berth Call chat itself ran on `gpt-oss-120b` because the external tester
+chose that model. The saved NeuralDeep preset is `kimi-k3.1-pro`. With
+`gpt-oss-120b` as the chat model, tool calls were unreliable: fields were
+dropped, and arguments of other actions were sent. A strong chat model matters
+for the factory as much as a strong builder does.
+
 ## Verification
 
 The isolated Task Chat regression exercises all three builders with synthetic
