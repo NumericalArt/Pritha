@@ -64,7 +64,7 @@ type RemovalState = {
   phrase: string;
   plan?: RemovalPlanView;
   error?: string;
-  done?: { moved: number; archive: string };
+  done?: { moved: number; archive: string; registryRebuilt?: boolean };
 };
 
 const REMOVAL_KIND_LABELS: Record<string, string> = { project: "project folder", memory: "documents", factory: "factory session", build: "build records", proposal: "proposal" };
@@ -252,7 +252,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json?.message || json?.error || `HTTP ${response.status}`);
-      setRemoval((current) => ({ ...current, running: false, done: { moved: json.moved, archive: json.archive } }));
+      setRemoval((current) => ({ ...current, running: false, done: { moved: json.moved, archive: json.archive, registryRebuilt: json.registryRebuilt } }));
       window.dispatchEvent(new Event("pritha:status-refresh"));
       router.refresh();
     } catch (error) {
@@ -669,6 +669,7 @@ export function AgentsOperatorExperience({ status, agents }: { status: ControlCe
               {removal.done ? (
                 <div className="operator-action-message ok">
                   Removed. {removal.done.moved} items moved to {removal.done.archive}; they can be restored from there.
+                  {removal.done.registryRebuilt === false ? " The registry could not be rebuilt now; it updates on the next rebuild." : ""}
                 </div>
               ) : !removal.open ? (
                 <button className="outline-button compact danger" type="button" onClick={() => void loadRemovalPlan(selectedAgent.id)}>

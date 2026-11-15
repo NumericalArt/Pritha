@@ -15,5 +15,5 @@ export type AgentRemovalPlan = {
 export type AgentRemovalOptions = { root?: string; stateRoot?: string; memoryRoot?: string; agentParent?: string; env?: Record<string, string | undefined> };
 export class AgentRemovalError extends Error { code: string; }
 export function planAgentRemoval(target: string, options?: AgentRemovalOptions): AgentRemovalPlan;
-export function applyAgentRemoval(target: string, input: { planHash?: string; confirmation?: string; actor?: string }, options?: AgentRemovalOptions): { ok: true; archive: string; moved: number; name: string };
-export function restoreAgentRemoval(archiveDir: string, options?: AgentRemovalOptions): { ok: true; restored: number; name: string };
+export function applyAgentRemoval(target: string, input: { planHash?: string; confirmation?: string; actor?: string }, options?: AgentRemovalOptions): { ok: true; archive: string; moved: number; name: string; registryRebuilt: boolean };
+export function restoreAgentRemoval(archiveDir: string, options?: AgentRemovalOptions): { ok: true; restored: number; name: string; registryRebuilt: boolean };

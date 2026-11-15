@@ -37,6 +37,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       confirmation: typeof body.confirmation === "string" ? body.confirmation : "",
       actor: "user",
     }, { root });
-    return Response.json({ ok: true, name: result.name, moved: result.moved, archive: path.relative(resolvePrithaStateRoot(root), result.archive) });
+    return Response.json({ ok: true, name: result.name, moved: result.moved, archive: path.relative(resolvePrithaStateRoot(root), result.archive), registryRebuilt: result.registryRebuilt });
   } catch (error) { return failure(error); }
 }

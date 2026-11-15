@@ -127,10 +127,17 @@ function archiveTarget(ctx, archiveDir, move) {
   return path.join(archiveDir, move.kind, path.relative(base, move.from));
 }
 
+// The script path comes from the Pritha checkout, not from this module: inside
+// the Control Center bundle this module's own URL points at a copied asset, and
+// the first live removal on 2026-11-15 failed to rebuild the registry that way.
+// A failed rebuild is reported, never mistaken for a failed removal.
 function rebuildRegistry(ctx) {
-  const script = fileURLToPath(new URL("./index.mjs", import.meta.url));
-  execFileSync(process.execPath, [script, "registry"], { cwd: ctx.root, stdio: "ignore", timeout: 120_000,
-    env: { ...process.env, ...prithaRootEnvironment(ctx.root), PRITHA_STATE_ROOT: ctx.stateRoot, PRITHA_AGENT_PARENT: ctx.agentParent } });
+  const script = path.join(ctx.root, "scripts", "agents-mother", "index.mjs");
+  try {
+    execFileSync(process.execPath, [script, "registry"], { cwd: ctx.root, stdio: "ignore", timeout: 120_000,
+      env: { ...process.env, ...prithaRootEnvironment(ctx.root), PRITHA_STATE_ROOT: ctx.stateRoot, PRITHA_AGENT_PARENT: ctx.agentParent } });
+    return true;
+  } catch { return false; }
 }
 
 /** Move the planned files into the archive. Needs the unchanged plan hash and the exact phrase. */
@@ -174,8 +181,8 @@ export function applyAgentRemoval(target, { planHash, confirmation, actor = "use
   }
   manifest.status = "removed";
   save();
-  rebuildRegistry(ctx);
-  return { ok: true, archive: archiveDir, moved: manifest.moves.length, name: plan.name };
+  const registryRebuilt = rebuildRegistry(ctx);
+  return { ok: true, archive: archiveDir, moved: manifest.moves.length, name: plan.name, registryRebuilt };
 }
 
 /** Move an archived agent back, if none of its original places is taken again. */
@@ -190,8 +197,8 @@ export function restoreAgentRemoval(archiveDir, options = {}) {
   manifest.status = "restored";
   manifest.restoredAt = new Date().toISOString();
   fs.writeFileSync(path.join(archiveDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n", { mode: 0o600 });
-  rebuildRegistry(ctx);
-  return { ok: true, restored: manifest.moves.length, name: manifest.name };
+  const registryRebuilt = rebuildRegistry(ctx);
+  return { ok: true, restored: manifest.moves.length, name: manifest.name, registryRebuilt };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

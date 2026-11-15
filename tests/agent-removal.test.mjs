@@ -46,6 +46,7 @@ test("a factory child moves whole into the archive, leaves the catalog and comes
   assert.ok(existsSync(files.project), "a refused confirmation moves nothing");
   const result = applyAgentRemoval(id, { planHash: plan.planHash, confirmation: plan.confirmationPhrase }, f.options);
   assert.equal(result.moved, 6);
+  assert.equal(result.registryRebuilt, true);
   for (const file of Object.values(files)) assert.equal(existsSync(file), false, file);
   assert.equal(existsSync(path.dirname(files.run)), false, "an emptied build folder goes too");
   assert.equal(f.catalog().agents.some((agent) => agent.agentId === id), false);
