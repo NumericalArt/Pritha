@@ -587,10 +587,7 @@ function SummaryCard({ status }: { status?: ControlCenterStatus }) {
           </dd>
         </div>
       </dl>
-      <button className="outline-button full" type="button" aria-disabled="true" title="Run from CLI: node scripts/self-test.mjs">
-        <Play size={16} />
-        Self-test is CLI-only
-      </button>
+      <p className="settings-cli-hint">Run a self-test in a terminal: <code>node scripts/self-test.mjs</code></p>
     </section>
   );
 }
@@ -988,15 +985,12 @@ function ProactivityCard({ status }: { status?: ControlCenterStatus }) {
           <span>Proactivity status: {statusLabel}.</span>
         </div>
       </div>
-      <button className="outline-button full" type="button" aria-disabled="true" title="Proactivity configuration is planned">
-        Configure Draft
-      </button>
       <div className="manual-action-row">
-        <span>Manual Actions</span>
-        <button className="outline-button" type="button" aria-disabled="true" title="Manual checks live on the Agents page">
+        <span>Manual checks</span>
+        <a className="outline-button" href="/agents">
           <Play size={16} />
           Agents page
-        </button>
+        </a>
       </div>
     </section>
   );
@@ -1026,9 +1020,6 @@ function ProactivitySettingsSection({ status }: { status?: ControlCenterStatus }
           <strong>Cron adapter</strong>
           <span>{cronLabel}. Proactivity status: {statusLabel}.</span>
         </div>
-        <button className="outline-button" type="button" aria-disabled="true" title="Proactivity configuration is planned">
-          Configure Draft
-        </button>
       </div>
     </section>
   );

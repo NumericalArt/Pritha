@@ -145,7 +145,7 @@ export function AgentCard({
               {agent.version}
             </span>
           </div>
-          <p>{agent.description}</p>
+          <p title={mobile ? undefined : agent.description}>{agent.description}</p>
           {mobile ? (
             <span className={`activity-label ${agent.activity}`}>
               <span className={`dot ${agent.activity === "active" ? "green" : ""}`} />

@@ -1036,11 +1036,43 @@ a {
   background: var(--accent-orange);
 }
 
+/* The icon sits beside the name and the mission uses the full card width:
+   an 84px icon column left about a third of a card for text, so short names
+   wrapped and missions ran hundreds of pixels down (2026-11-15). */
 .agent-top {
   display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: 18px;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 10px;
   align-items: center;
+}
+
+.agent-top > .agent-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.agent-top > .agent-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.agent-top > .agent-copy {
+  display: contents;
+}
+
+.agent-top .agent-title-row {
+  grid-column: 2;
+  align-items: center;
+}
+
+.agent-top .agent-copy p {
+  grid-column: 1 / -1;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .agent-icon {
@@ -4717,6 +4749,20 @@ button[aria-disabled="true"] {
 .proactivity-box span {
   margin-top: 6px;
   color: var(--text-secondary);
+}
+
+.settings-cli-hint {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.manual-action-row a.outline-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
 }
 
 .manual-action-row {
