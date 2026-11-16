@@ -14,13 +14,41 @@ const timeoutMs = 10000;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const children = new Set();
 const proof=typeof modelProof==='undefined'?null:modelProof;
-let modelServer,modelEnvironment={},modelCase=null,modelCalls=0,modelErrors=[];
+let modelServer,modelEnvironment={},modelCase=null,modelCalls=0,modelErrors=[],modelInstruction='';
 const substitute=(value,nonce)=>JSON.parse(JSON.stringify(value).replaceAll('__PRITHA_MODEL_TEXT__',nonce));
-const activate=check=>{modelCalls=0;modelErrors=[];modelCase=proof?substitute(check,randomBytes(20).toString('hex')):check;return modelCase;};
+const activate=check=>{modelCalls=0;modelErrors=[];modelInstruction='';modelCase=proof?substitute(check,randomBytes(20).toString('hex')):check;return modelCase;};
 function assertModel(check){
   if(!proof)return;
   assert.deepEqual(modelErrors,[],'The model request must use the approved connection and input.');
   assert.equal(modelCalls,check.model_output!==undefined || check.model_error!==undefined?1:0,'The product must make exactly the expected model calls; a fixed offline response is not a model result.');
+}
+// This responder replies with the example's model_output, so a product that
+// accepts only that exact value passes here and fails live: a model can reply
+// only with what its request asks for. Observed 2026-11-16: Cork Label required
+// a lowercase slug for cellar, its prompt never said so, and it refused every
+// live gpt-oss-20b answer. A fixed answer value that the model request does not
+// name must therefore be one the product also accepts in the model's own words.
+const namedIn=value=>new RegExp('(?<![\\p{L}\\p{N}])'+value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\p{L}\\p{N}])','iu');
+function unnamedAnswers(original){
+  // An error example may show the product refusing a model answer on purpose.
+  const output=original.model_output,success=(original.expected_status??200)===200 && (original.expected_exit??0)===0;
+  if(!proof || !success || !output || typeof output!=='object')return [];
+  const inputs=[...Object.values(original.input_json || {}),...(original.argv || []).slice(2)].filter(value=>typeof value==='string' && value.trim());
+  return Object.entries(output).filter(([,value])=>{
+    if(typeof value!=='string' || !value.trim() || value.includes('__PRITHA_MODEL_TEXT__') || value.length>200)return false;
+    const pattern=namedIn(value.trim());
+    // The product input is the user's data, not an instruction to the model.
+    const instruction=inputs.filter(input=>pattern.test(input)).reduce((text,input)=>text.split(input).join('\n'),modelInstruction);
+    return !pattern.test(instruction);
+  }).map(([key,value])=>({key,value}));
+}
+async function verifyNamedAnswers(original,accepted){
+  for(const {key,value} of unnamedAnswers(original)){
+    const variant=activate(original);
+    variant.model_output={...variant.model_output,[key]:value.charAt(0).toUpperCase()+value.slice(1)+' (model wording)'};
+    assert.ok(await accepted(variant),'The product refuses a model answer whose '+key+' is not exactly '+JSON.stringify(value)+', but its model request never names '+JSON.stringify(value)+'. This responder replies with your example; a live model replies only with what the request asks for. Name the allowed values or format of '+key+' in the model request (for example: '+key+' is one lowercase word such as '+value+'), or accept the model\'s own wording.');
+    assertModel(variant);
+  }
 }
 function assertConnectionPrivate(run){
   if(!proof)return;
@@ -40,6 +68,7 @@ async function prepareModel(){
       let text='';for await(const part of req){text+=part;if(Buffer.byteLength(text)>40000)throw Error('Model input too large');}
       const body=JSON.parse(text),input=body.input;
       assert.ok(modelCase && Array.isArray(input.messages) && input.messages.length);
+      modelInstruction=[input.system,...input.messages.map(m=>m?.content)].filter(value=>typeof value==='string').join('\n');
       assert.ok((input.maxTokens || proof.configuration.maxOutputTokens)<=proof.configuration.maxOutputTokens);
       const userText=input.messages.filter(m=>m.role==='user').map(m=>m.content).join('\n');
       const values=Object.values(modelCase.input_json || {}).filter(v=>typeof v==='string' && v.trim());
@@ -190,6 +219,12 @@ try {
       if(check.expected_json){const actual=JSON.parse(run.output.stdout);assert.deepEqual(actual,check.expected_json,'CLI product JSON differs for '+JSON.stringify(check.argv.slice(2)));if(result.code===0)demo.cli??=actual;}
       assertModel(check);
     } finally { clearTimeout(timer); await stop(run); assertConnectionPrivate(run); }
+    await verifyNamedAnswers(original,async variant=>{
+      const probe=start(variant.argv);
+      const probeTimer=setTimeout(()=>probe.child.kill('SIGKILL'),timeoutMs);
+      try{return (await probe.completion).code===0;}
+      finally{clearTimeout(probeTimer);await stop(probe);assertConnectionPrivate(probe);}
+    });
   }
   const port = await unusedPort();
   const first = checks.http[0];
@@ -204,6 +239,7 @@ try {
       assert.equal(result.status,check.expected_status??200,'HTTP product status differs for '+JSON.stringify(check.input_json));
       if(check.expected_json){const actual=JSON.parse(result.text);assert.deepEqual(actual,check.expected_json,'HTTP product JSON differs for '+JSON.stringify(check.input_json));if(result.status===200)demo.http??=actual;}
       assertModel(check);
+      await verifyNamedAnswers(original,async variant=>{const probe=await request(port,variant);return probe.status>=200 && probe.status<300;});
     }
   } finally { await stop(run); assertConnectionPrivate(run); }
   await verifyMissingConnection();

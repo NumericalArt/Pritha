@@ -71,3 +71,48 @@ test('every rejected product example names the violated rule and the example, wi
   rejects(t=>{t.http=[t.http[1]];},'factory_product_trial_variants_required',/at least one successful http example/);
   rejects(t=>{t.http=[];},'factory_product_trial_variants_required',/between 1 and 8 http examples/);
 });
+
+test('a protected product trial refuses a product that requires a fixed model answer its request never names',t=>{
+  // Observed 2026-11-16: Cork Label passed this Trial, yet refused every live
+  // gpt-oss-20b answer with provider_response_invalid. Its parser required a
+  // lowercase slug for cellar; its prompt asked only for "a cellar category",
+  // and the responder simply replied with the example value "red".
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'pritha-llm-named-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const data={text:'',coreFunctions:[],criticalWorkflows:[],agentName:'Cork fixture',runtimeFamily:'api',primaryInterface:'api',secondaryInterfaces:'none',memoryModel:'none',toolSystem:'none',skillNeeds:'none',telegramMode:'none',serviceMode:'process',proactiveMode:'none',autostart:'disabled',envExampleVariables:'FIXTURE_PORT=3041',childModelProvider:'neuraldeep',childModelId:'gpt-oss-20b',childModelConnection:'pritha',childMaxOutputTokens:'256'};
+  const check=(bottle,extra)=>({argv:['node','scripts/server.mjs'],port_variable:'FIXTURE_PORT',path:'/cork',input_json:{bottle},covers:['F001'],...extra});
+  const trial={http:[
+    check('a dark red from the hill',{expected_json:{label:'__PRITHA_MODEL_TEXT__',cellar:'red'},model_output:{label:'__PRITHA_MODEL_TEXT__',cellar:'red'}}),
+    check('a pale dry from the coast',{expected_json:{label:'__PRITHA_MODEL_TEXT__',cellar:'white'},model_output:{label:'__PRITHA_MODEL_TEXT__',cellar:'white'}}),
+    // An error example may show a model answer the product refuses on purpose.
+    check('a cloudy bottle',{expected_status:503,expected_json:{error:'provider_response_invalid'},model_output:{label:'',cellar:'Not A Slug'}}),
+    check(' ',{expected_status:400,expected_json:{error:'invalid_bottle'}}),
+  ]};
+  for(const file of generatedAgentFiles(data)){const target=path.join(root,file.path);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,file.content);}
+  fs.mkdirSync(path.join(root,'verification'),{recursive:true});fs.writeFileSync(path.join(root,'verification/product.mjs'),productTrialVerifier(trial,data));
+  fs.appendFileSync(path.join(root,'README.md'),'\n'+Object.values(firstUseExamples(trial,data)).join('\n'));
+  fs.writeFileSync(path.join(root,'scripts/service-control.mjs'),"import {spawn} from 'node:child_process';const child=spawn(process.execPath,['scripts/server.mjs'],{detached:true,stdio:'ignore',env:process.env});child.unref();");
+  const builtPrompt='Turn the bottle note into a concise wine label line and a cellar category. Respond with only a JSON object: {"label":"...","cellar":"..."}.';
+  const label="typeof value.label==='string' && value.label.length>0",slug=label+' && /^[a-z][a-z0-9_-]{0,63}$/.test(value.cellar)';
+  const server=(system,accepts)=>`import http from 'node:http';import {readChildProvider,requestChildModel} from './lib/child-model-client.mjs';
+  http.createServer(async(req,res)=>{if(req.url==='/health'){res.end(JSON.stringify({ok:true}));return;}let body='';for await(const part of req)body+=part;const input=JSON.parse(body);res.setHeader('content-type','application/json');
+    if(typeof input.bottle!=='string' || !input.bottle.trim()){res.writeHead(400);res.end(JSON.stringify({error:'invalid_bottle'}));return;}
+    try{const selected=readChildProvider(process.cwd());const result=await requestChildModel(selected.configuration,{system:${JSON.stringify(system)},messages:[{role:'user',content:input.bottle}],maxTokens:256},selected);
+      const value=JSON.parse(result.content[0].text);if(!(${accepts}))throw Object.assign(Error('invalid'),{code:'provider_response_invalid'});res.end(JSON.stringify({label:value.label,cellar:value.cellar}));}
+    catch(e){res.writeHead(503);res.end(JSON.stringify({error:e.code}));}
+  }).listen(Number(process.env.FIXTURE_PORT),'127.0.0.1');`;
+  const run=code=>{fs.writeFileSync(path.join(root,'scripts/server.mjs'),code);return spawnSync(process.execPath,['verification/product.mjs'],{cwd:root,encoding:'utf8',timeout:30000,env:{PATH:process.env.PATH,HOME:root}});};
+
+  const built=run(server(builtPrompt,slug));
+  assert.notEqual(built.status,0,'The Cork Label shape must not pass');
+  assert.match(built.stderr,/refuses a model answer whose cellar is not exactly "red", but its model request never names "red"/);
+  assert.match(built.stderr,/Name the allowed values or format of cellar in the model request/);
+  // The bottle note itself mentions "red"; product input is data, not an instruction.
+  assert.ok(!built.stderr.includes('"white"'),'The first unnamed answer stops the Trial');
+
+  const named=run(server(builtPrompt+' cellar is one lowercase word such as red, white, rose or sparkling.',slug));
+  assert.equal(named.status,0,named.stderr);
+  assert.equal(JSON.parse(named.stdout).liveModelVerified,false);
+
+  const ownWords=run(server(builtPrompt,label+" && typeof value.cellar==='string' && value.cellar.trim().length>0"));
+  assert.equal(ownWords.status,0,ownWords.stderr);
+});

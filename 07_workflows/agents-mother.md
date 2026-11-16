@@ -1057,7 +1057,13 @@ each input it supplies a fresh response through a local model responder and
 requires the product output to contain that fresh value. A constant offline
 answer cannot pass. The verifier checks the input sent to the model, call count,
 configured limits and selected error cases; starting the server must not call
-the model. The real Start command also runs up to an intercepted spawn boundary:
+the model. Because the responder replies with the example's `model_output`, a
+successful example's fixed answer value (one without `__PRITHA_MODEL_TEXT__`)
+must be named in the model request, apart from the product input, or the product
+must also accept that field in the model's own wording: the verifier replies
+once more with the value reworded and requires success. Cork Label (2026-11-16)
+passed the earlier verifier yet refused every live answer, because its parser
+required a lowercase `cellar` slug that its prompt never asked for. The real Start command also runs up to an intercepted spawn boundary:
 it must launch its own Node server and forward the scoped model connection and
 port. This check creates no detached server; the independent product and Stop
 Trials exercise the server with owned process handles. The UI labels these as
