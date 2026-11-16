@@ -1111,6 +1111,15 @@ preparation use their observed counters, with a stop at an observed boundary;
 they cannot promise an exact per-request upper bound. Builder-specific
 accounting and protected verifier checks still apply.
 
+A Responses request reserves its input, a margin of 8192 tokens and its
+output cap. When it repeats the previous measured request exactly (same
+instructions, tools and leading items) and only appends items, the measured
+input tokens stand for that prefix and only the appended items count at one
+token per UTF-8 byte. Otherwise the whole request counts by its bytes. Bytes
+alone overstated kimi requests about 4.5 times, so builds paused for a budget
+extension with half their tokens unspent (2026-11-16). Usage above a
+reservation still stops the run as `provider_budget_overshoot`.
+
 Count cached input as usage. Show observed tokens, outstanding reservations,
 preparation/build subtotals and active provider time separately. Approval
 waiting is excluded. Preserve pre-upgrade observations and identify their

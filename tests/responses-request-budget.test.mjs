@@ -91,3 +91,68 @@ test('durable response diagnostics retain only structural counts and preserve me
   assert.equal(diagnostic.outputTokens,55);assert.equal(diagnostic.reasoningTokens,32);assert.equal(diagnostic.outputItems.reasoning,1);assert.equal(diagnostic.terminalPublicText,false);
   assert(!JSON.stringify(snapshots).includes(secret));assert.equal(diagnostic.id,undefined);assert.equal(diagnostic.outputItems.private,undefined);
 });
+
+// A stateless Responses client (Codex CLI 0.153.0, checked 2026-11-16) resends the same
+// instructions, tools and earlier items and appends the model's call and its output.
+const conversation=(turns,{instructions='Build the approved agent.',pad=4000,output=200}={})=>({model:'vendor/model',instructions,tools:[{type:'function',name:'shell',parameters:{type:'object'}}],max_output_tokens:16384,
+  input:[{type:'message',role:'user',content:[{type:'input_text',text:'Implement the approved result. '+'context '.repeat(pad)}]},
+    ...Array.from({length:turns},(_,i)=>[{type:'function_call',call_id:'call_'+i,name:'shell',arguments:'{"command":["ls"]}'},{type:'function_call_output',call_id:'call_'+i,output:'file '.repeat(output)+i}]).flat()]});
+const measured=(hash,input,output=200)=>({requestHash:hash,upstreamAttempted:true,usage:{input_tokens:input,output_tokens:output,total_tokens:input+output}});
+
+test('a request that extends the measured previous one reserves its measured tokens plus only the new bytes',async()=>{
+  const snapshots=[],budget=new ResponsesRequestBudget({tokenBudget:400000,checkpoint:async value=>snapshots.push(value)});
+  const first=conversation(0),firstBytes=Buffer.byteLength(JSON.stringify(first));
+  await budget.begin(first,{requestHash:'r1'});
+  let row=budget.snapshot().requests[0];assert.equal(row.estimateBasis,'utf8-bytes');assert.equal(row.inputEstimate,firstBytes);
+  await budget.record(measured('r1',7000));
+  const second=conversation(1),newItems=Buffer.byteLength(JSON.stringify(second.input.slice(1)));
+  await budget.begin(second,{requestHash:'r2'});row=budget.snapshot().requests[1];
+  assert.equal(row.estimateBasis,'measured-prefix');assert.deepEqual(row.measuredPrefix,{sequence:1,inputTokens:7000,newItemBytes:newItems});
+  assert.equal(row.inputEstimate,7000+newItems);assert.equal(row.reservedTokens,7000+newItems+8192+row.maxOutputTokens);
+  assert.ok(row.inputEstimate<Buffer.byteLength(JSON.stringify(second))/2,'the measured prefix replaces most of the byte estimate');
+  await budget.record(measured('r2',7400));
+  // A local refusal that never reached the provider keeps the last measured base.
+  await budget.begin(conversation(2),{requestHash:'r3'});await budget.record({requestHash:'r3',upstreamAttempted:false,usage:null});
+  await budget.begin(conversation(2),{requestHash:'r4'});row=budget.snapshot().requests[3];
+  assert.equal(row.estimateBasis,'measured-prefix');assert.equal(row.measuredPrefix.sequence,2);
+});
+
+test('changed instructions, tools or earlier items fall back to the full byte reservation',async()=>{
+  const base=conversation(1);
+  const changes={instructions:{...conversation(2),instructions:'Something else.'},tools:{...conversation(2),tools:[]},
+    history:{...conversation(2),input:[{...base.input[0],content:[{type:'input_text',text:'A compacted summary.'}]},...conversation(2).input.slice(1)]},
+    text:{...conversation(2),input:'one string input'}};
+  for(const [name,next] of Object.entries(changes)){
+    const budget=new ResponsesRequestBudget({tokenBudget:400000,checkpoint:async()=>{}});
+    await budget.begin(base,{requestHash:'r1'});await budget.record(measured('r1',7000));
+    await budget.begin(next,{requestHash:'r2'});const row=budget.snapshot().requests[1];
+    assert.equal(row.estimateBasis,'utf8-bytes',name);assert.equal(row.inputEstimate,Buffer.byteLength(JSON.stringify(next)),name);assert.equal(row.measuredPrefix,undefined,name);
+  }
+});
+
+test('usage above a measured-prefix reservation still stops the run as an overshoot',async()=>{
+  const budget=new ResponsesRequestBudget({tokenBudget:400000,checkpoint:async()=>{}});
+  await budget.begin(conversation(0),{requestHash:'r1'});await budget.record(measured('r1',7000));
+  await budget.begin(conversation(1),{requestHash:'r2'});const reserved=budget.snapshot().requests[1].reservedTokens;
+  await assert.rejects(budget.record(measured('r2',reserved,10)),{code:'provider_budget_overshoot'});
+  await assert.rejects(budget.begin(conversation(2),{requestHash:'r3'}));
+});
+
+test('a long build reaches most of its authorized budget instead of pausing at half (Cork Label replay)',async()=>{
+  // Measured 2026-11-16: kimi requests carried about 4.5 UTF-8 bytes per input token.
+  const run=async prefixAware=>{
+    const budget=new ResponsesRequestBudget({tokenBudget:400000,checkpoint:async()=>{}});let turns=0;
+    for(;turns<200;turns++){
+      // About 15K tokens at the start and 3K more per step, as in Cork Label's first iteration.
+      const request=conversation(turns,{pad:8400,output:2700});
+      if(!prefixAware)budget.measuredPrefix=null;
+      try{await budget.begin(request,{requestHash:'t'+turns});}catch(error){assert.equal(error.code,'provider_budget_exhausted');break;}
+      await budget.record(measured('t'+turns,Math.ceil(Buffer.byteLength(JSON.stringify(request))/4.5),600));
+    }
+    return budget.snapshot().tokensUsed;
+  };
+  const before=await run(false),after=await run(true);
+  // Byte reservations paused the replay at 249,658 with 150K tokens left (Cork Label: 206,125 with 194K left).
+  assert.ok(before<0.65*400000,'bytes alone pause early: '+before);
+  assert.ok(after>0.8*400000,'the measured prefix uses most of the budget: '+after);
+});

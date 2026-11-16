@@ -39,12 +39,35 @@ function assertText(payload){
   const tools=list=>{if(list==null)return;if(!Array.isArray(list))reject();for(const tool of list){if(tool?.type==='namespace' && Array.isArray(tool.tools))tools(tool.tools);else if(!['function','custom'].includes(tool?.type))reject();}};tools(payload.tools);
 }
 
-/** Conservative UTF-8-byte reservations, never claimed to be tokenizer counts.
+/** Request shape for the measured-prefix reservation: everything except the
+ * input list, and one hash per input item. */
+function requestShape(payload){
+  if(!Array.isArray(payload.input))return null;
+  const {input,max_output_tokens:_output,...envelope}=payload;
+  return {envelope:hash(envelope),items:input.map(item=>hash(item))};
+}
+function extendsPrefix(prior,shape){
+  return Boolean(prior && shape && prior.envelope===shape.envelope && shape.items.length>=prior.items.length
+    && prior.items.every((item,index)=>item===shape.items[index]));
+}
+
+/** Conservative reservations, never claimed to be tokenizer counts.
+ *
+ * A stateless Responses client resends the whole conversation with every
+ * request. When a request repeats the previous measured request exactly (same
+ * instructions, tools and leading input items) and only appends items, the
+ * provider's measured input tokens stand for that prefix and only the appended
+ * items are reserved at one token per UTF-8 byte. Any other request is reserved
+ * entirely by its bytes. Bytes alone overstated kimi requests about 4.5 times
+ * and paused builds at half their authorized budget (2026-11-16). The overshoot
+ * check below still stops a run whose usage exceeds its reservation.
  * Every completed receipt is durable before executable tool output is released. */
 export class ResponsesRequestBudget {
   constructor({tokenBudget,checkpoint,contextTokens=null}){
     if(!Number.isSafeInteger(tokenBudget) || tokenBudget<1 || typeof checkpoint!=='function')throw fail('provider_budget_invalid');
     this.tokenBudget=tokenBudget;this.checkpoint=checkpoint;this.contextTokens=contextTokens;this.rows=[];this.current=null;this.preparing=false;this.errorCode=null;this.admissionFailure=null;
+    // The last measured request this process sent: its shape and its provider-measured input tokens.
+    this.measuredPrefix=null;this.currentShape=null;
   }
   snapshot(){const observed=this.rows.reduce((n,row)=>n+(row.usage?.totalTokens || 0),0),known=count(observed) && this.rows.every(row=>row.status==='measured');return {version:1,tokenBudget:this.tokenBudget,tokensUsed:known?observed:null,observedTokens:observed,usageKnown:known,errorCode:this.errorCode,...(this.admissionFailure?{admissionFailure:{...this.admissionFailure}}:{}),requests:structuredClone(this.rows)};}
   async begin(payload,{requestHash}={}){
@@ -53,7 +76,10 @@ export class ResponsesRequestBudget {
       assertText(payload);const snapshot=this.snapshot();if(!snapshot.usageKnown)throw fail('provider_usage_unconfirmed');
       if(this.rows.length>=384)throw fail('provider_request_limit');
       if(!Number.isSafeInteger(payload.max_output_tokens) || payload.max_output_tokens<1)throw fail('provider_budget_invalid');
-      const bytes=Buffer.byteLength(JSON.stringify(payload)),reserve=bytes+8192,available=this.tokenBudget-snapshot.tokensUsed-reserve-64;
+      const bytes=Buffer.byteLength(JSON.stringify(payload)),shape=requestShape(payload),prior=this.measuredPrefix;
+      const prefix=extendsPrefix(prior,shape)?{sequence:prior.sequence,inputTokens:prior.inputTokens,newItemBytes:Buffer.byteLength(JSON.stringify(payload.input.slice(prior.items.length)))}:null;
+      const estimate=prefix?prefix.inputTokens+prefix.newItemBytes:bytes;
+      const reserve=estimate+8192,available=this.tokenBudget-snapshot.tokensUsed-reserve-64;
       const output=Math.min(payload.max_output_tokens,32768,available);
       if(output<Math.min(payload.max_output_tokens,1024)){
         const requiredTokens=reserve+64+Math.min(payload.max_output_tokens,1024),remainingTokens=this.tokenBudget-snapshot.tokensUsed;
@@ -66,9 +92,9 @@ export class ResponsesRequestBudget {
       // model's configured context window. Keep the estimate as a diagnostic.
       const contextEstimate=this.contextTokens?{estimatedTokens:Math.ceil(bytes/2)+8192+output,declaredLimit:this.contextTokens,basis:'utf8-bytes-divided-by-two',enforcement:'advisory'}:null;
       payload={...payload,max_output_tokens:output};
-      const row={sequence:this.rows.length+1,requestHash:requestHash || hash(payload),wireHash:hash(payload),status:'reserved',inputEstimate:bytes,estimateMargin:8192,maxOutputTokens:output,reservedTokens:reserve+output,...(contextEstimate?{contextEstimate}:{}),usage:null,createdAt:new Date().toISOString()};
+      const row={sequence:this.rows.length+1,requestHash:requestHash || hash(payload),wireHash:hash(payload),status:'reserved',inputEstimate:estimate,estimateBasis:prefix?'measured-prefix':'utf8-bytes',...(prefix?{measuredPrefix:prefix}:{}),estimateMargin:8192,maxOutputTokens:output,reservedTokens:reserve+output,...(contextEstimate?{contextEstimate}:{}),usage:null,createdAt:new Date().toISOString()};
       if(this.rows.some(prior=>prior.requestHash===row.requestHash))throw fail('provider_request_uncertain');
-      this.rows.push(row);this.current=row;await this.checkpoint(this.snapshot());return payload;
+      this.rows.push(row);this.current=row;this.currentShape=shape;await this.checkpoint(this.snapshot());return payload;
     }catch(error){
       this.errorCode=error.code || 'provider_budget_checkpoint_failed';
       // A refused request has no reservation or usage row. Persist its reason
@@ -85,6 +111,10 @@ export class ResponsesRequestBudget {
     const diagnostics=responseDiagnostics(event.responseSummary);if(diagnostics)row.responseDiagnostics=diagnostics;
     if(!known)this.errorCode='provider_usage_unconfirmed';
     else if(row.usage.totalTokens>row.reservedTokens || this.snapshot().tokensUsed>this.tokenBudget)this.errorCode='provider_budget_overshoot';
+    // Only a request the provider answered and measured becomes the base of the next reservation.
+    if(known && row.upstreamAttempted && row.usage.inputTokens>0 && this.currentShape)this.measuredPrefix={...this.currentShape,inputTokens:row.usage.inputTokens,sequence:row.sequence};
+    else if(!known)this.measuredPrefix=null;
+    this.currentShape=null;
     try{await this.checkpoint(this.snapshot());this.current=null;}catch{this.errorCode='provider_budget_checkpoint_failed';throw fail(this.errorCode);}
     if(this.errorCode)throw fail(this.errorCode);
   }
