@@ -1176,6 +1176,24 @@ A Control Center of another instance is never used. Its health must report
 this instance's id and port. A headless run without a Control Center keeps the
 static card checks and records `cardContract: not-checked`.
 
+### After the handoff
+
+A working handoff completes the creation, also when the request asked for a
+running agent. Nothing in the creation chat starts, stops or calls the agent:
+the operator starts it with Start on its card and tries it there. With a Pritha
+model connection the checks use a protected local responder, so
+`liveModelVerified: false` is expected; the first live model call happens when
+the operator tries the agent. The `finish` result and `factory_status` say
+this, and the model ends its turn with a short report: what was built, where
+its project is, what was verified, and that the agent starts from its card. It
+does not search the code for a start command or request commands for it.
+
+Observed 2026-11-16: without this guidance a builder asked for a "running"
+agent spent the second half of its turn on that search and on three command
+requests that expired, until the turn reached its time limit. Task Chat now
+reports a turn that used up its time as a time limit with the saved work kept,
+not as a provider error.
+
 ## Removing an agent
 
 The agent's action panel offers "Remove agent…". Only children built by the

@@ -342,7 +342,8 @@ export class ProviderFactoryTools {
         custom_workflow:'This agent was created through the custom draft workflow, which this chat cannot revise after its build.',
         not_applied:'The verified build is not applied to the project yet. Complete finish before revising it.'}[revision.reason] || 'It cannot be revised in its current state.';
       return {owner:'user',reason:plan.reason,revisionAfterBuild:revision.available?{available:true,action:'improve',requiredFields:['product'],optionalFields:['note']}:{available:false,reason:revision.reason},
-        hint:'The agent is built and checked. The user launches and tries it from its card and decides about acceptance. '+(revision.available
+        hint:'The agent is built and checked. Nothing in this chat starts, stops or calls it: the user starts and tries it from its card on the Agents page and decides about acceptance. '
+          +'A request to have it running is complete at this point: report that and do not look for a start command or request commands to start it. '+(revision.available
           ?'If the user asks to change how it behaves, call factory_improve with the COMPLETE revised product examples (the factory_propose.product format: every example the agent must still satisfy plus the changed and added ones) and a short note. factory_status.revisionBase holds the applied version\'s examples and the numbered functions to start from. Do not resend brief or limits and do not call propose, scaffold or deliver: the accepted Contract stays as it is. The host prepares the revised Outcome and verifier, builds on the applied version and replaces it only after the revision is verified. A change of name, interfaces, port, model or limits is not a revision; say so plainly and offer a new agent.'
           :why+' Do not call propose, scaffold or deliver for it and do not edit its documents or project. If the user asks for a change, say this plainly.')};
     }

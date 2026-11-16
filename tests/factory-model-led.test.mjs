@@ -58,6 +58,11 @@ for(const provider of providers)test(provider[0]+': model-led Task Chat reaches 
   const finished=await f.call('research_decide',{answer:'Memory and the built-in local API adapter are sufficient. The optional documentation page is unavailable; implement the simple enum response and verify the model connection and lifecycle through execution.'});
  assert.equal(finished.error,undefined,JSON.stringify(finished));assert.equal(finished.continuationFailed,false,JSON.stringify(finished));
  assert.equal(f.state().phase,'awaiting-manual-acceptance',JSON.stringify(finished));assert.equal(f.builds.length,1);
+ // The handoff tells the model to report and stop: Start and Try belong to the card (2026-11-16).
+ assert.match(JSON.stringify(finished),/Nothing in this chat starts, stops or calls the agent/);
+ assert.match(JSON.stringify(finished),/first live model call happens when the user tries it/);
+ assert.doesNotMatch(JSON.stringify(finished),/Services remain stopped/);
+ assert.match((await f.call('status')).nextStep.hint,/Nothing in this chat starts, stops or calls it/);
  assert.equal(f.reviews.length,0);assert.equal(f.progress().firstUse.disposition,'applied-local-project');
  assert.deepEqual(f.progress().firstUse.unverifiedRequirements,['Explain unusual input in the user guide']);
  assert.equal(JSON.parse(fs.readFileSync(path.join(f.paths.target,'runtime/provider.json'))).connection,'pritha');

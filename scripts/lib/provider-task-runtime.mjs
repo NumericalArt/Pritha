@@ -414,7 +414,10 @@ export class ProviderTaskRuntime {
     const exited=result.processTreeExited===true;
     const status=!exited?'failed':active.stopping || result.errorCode==='operator_cancel'?'interrupted':result.ok?'completed':'failed';
     const code=exited ? result.errorCode || 'provider_runtime_failed' : 'provider_process_exit_unconfirmed';
+    // A turn that used up its time is not a provider error (2026-11-16).
+    const timeLimit='This turn reached its time limit (Task timeout in Settings) and stopped before its next model request. Everything done so far is saved, including completed factory steps. Send a message in this chat to continue from where it stopped.';
     const factoryMessages={
+      provider_iteration_deadline:timeLimit,iteration_deadline:timeLimit,job_deadline:timeLimit,
       factory_attempt_active:'An earlier creation attempt is still running or awaiting reconciliation. Open its chat and stop or finish that attempt before continuing here.',
       factory_attempt_moved:'This unfinished creation has continued in a newer chat. Open that chat to continue; its history and total usage are preserved.',
       factory_attempt_recovery_required:'This name already has saved creation work. Continue in the original agent chat, or choose a new name for a separate agent.',

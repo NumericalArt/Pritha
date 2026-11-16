@@ -11,7 +11,7 @@ const session='12345678-1234-1234-1234-123456789012';
 const boundary={probeCli:async()=>({available:true,version:'0.153.0'}),prepareSandbox:options=>({command:options.command,args:options.args})};
 function fixture(t){const root=mkdtempSync(path.join(os.tmpdir(),'pritha-nd-run-'));mkdirSync(path.join(root,'code'));mkdirSync(path.join(root,'state'));t.after(()=>rmSync(root,{recursive:true,force:true}));return {root:path.join(root,'code'),cwd:path.join(root,'code'),stateRoot:path.join(root,'state'),privateRoot:path.join(root,'state','private','neuraldeep'),temporaryRoot:root,codexBin:process.execPath,model:'qwen3.8-27b',effort:'xhigh',prompt:'Fixture task',timeoutMs:10000,sandbox:'read-only'};}
 const providerResponse=()=>new Response(`data: ${JSON.stringify({type:'response.completed',response:{id:'response',status:'completed',output:[{type:'message',id:'message',role:'assistant',content:[{type:'output_text',text:'Fixture answer'}]}],usage:{input_tokens:4,output_tokens:2}}})}\n\ndata: [DONE]\n\n`,{headers:{'content-type':'text/event-stream'}});
-function fakeSupervisor(capture,{resumeId=session,wrongModel=false,wait=false,treeExited=true}={}){
+function fakeSupervisor(capture,{resumeId=session,wrongModel=false,wait=false,treeExited=true,requestDelayMs=0}={}){
   return async(command,args,options)=>{
     Object.assign(capture,{command,args,options});
     await options.beforeStart?.({version:1,session:42,escaped:[],coverage:'observed'});
@@ -20,6 +20,7 @@ function fakeSupervisor(capture,{resumeId=session,wrongModel=false,wait=false,tr
     const close=code=>{child.stdout.end();child.stderr.end();finish({code,signal:stopped?'SIGTERM':null,processTreeExited:treeExited,error:null});};
     child.stdin.resume();child.stdin.on('finish',()=>{void(async()=>{
       if(wait)return;
+      if(requestDelayMs)await new Promise(resolve=>setTimeout(resolve,requestDelayMs));
       const base=JSON.parse(args.find(value=>value.startsWith('model_providers.neuraldeep.base_url=')).split('=').slice(1).join('='));
       const response=await fetch(base+'/responses',{method:'POST',headers:{authorization:`Bearer ${options.env.PRITHA_PROVIDER_CAPABILITY}`},body:JSON.stringify({model:wrongModel?'foreign-model':'qwen3.8-27b',stream:true})});
       capture.response=await response.text();
@@ -74,6 +75,16 @@ test('a classified empty response keeps its exact input error and measured usage
   assert.equal(result.budget.tokensUsed,6);assert.equal(result.budget.usageKnown,true);assert.equal(result.processTreeExited,true);assert.equal(calls,1);
   assert.equal(result.budget.requests[0].responseDiagnostics.emptyOutputRetrySafe,true);
   assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC_KEY|provider_input/);
+});
+
+test('a request after the turn time limit keeps the deadline code instead of a generic provider_control',async t=>{
+  // timeoutMs 4000: no new request is admitted after about 1.8 s; the hard stop is at 4 s (2026-11-16).
+  const options=fixture(t),capture={};let calls=0;
+  const run=await startNeuralDeepRun({...options,timeoutMs:4000},{...boundary,readCredential:()=> 'SYNTHETIC_KEY',spawnSupervised:fakeSupervisor(capture,{requestDelayMs:2200}),fetchImpl:async()=>{calls++;return providerResponse();}});
+  const result=await run.completion;
+  assert.equal(calls,0,'the provider is not called after the limit');
+  assert.equal(result.ok,false);assert.equal(result.providerError.class,'control');
+  assert.equal(result.errorCode,'provider_iteration_deadline');assert.equal(result.processTreeExited,true);
 });
 
 test('Stop controls only its owned run and unknown process exit preserves scratch for recovery',async t=>{

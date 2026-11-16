@@ -26,6 +26,8 @@ import {createSearchHost} from './search/host.mjs';
 import {providerToolInstructions} from './lib/provider-tool-instructions.mjs';
 
 const fail=(code,message='The selected NeuralDeep runtime could not complete this task.')=>Object.assign(new Error(message),{code});
+/** Adapter codes for a turn that used up its time; provider-task-runtime explains them to the user. */
+export const TURN_DEADLINE_CODES=new Set(['provider_iteration_deadline','iteration_deadline','job_deadline']);
 const modelPattern=/^[A-Za-z0-9][A-Za-z0-9._:/+\-]{0,199}$/;
 const sessionPattern=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const toml=value=>JSON.stringify(value);
@@ -181,7 +183,8 @@ export async function startNeuralDeepRun(options,dependencies={}){
         const toolsExited=await closeTools();verifiedExit=result.processTreeExited===true && toolsExited;
         // Input refusals already carry host-classified, non-secret codes. Keep
         // the precise cause in durable build receipts instead of provider_input.
-        const errorCode=budget?.budget.errorCode || state.errorCode || stopReason || (providerError?.class==='input'?providerError.code:providerError?'provider_'+providerError.class:null) || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
+        // A turn's time limit keeps its own code and user message instead of a generic provider_control (2026-11-16).
+        const errorCode=budget?.budget.errorCode || state.errorCode || stopReason || (providerError?.class==='input' || TURN_DEADLINE_CODES.has(providerError?.code)?providerError.code:providerError?'provider_'+providerError.class:null) || (!verifiedExit?'provider_process_exit_unconfirmed':null) || (result.code!==0 || result.error || state.failed || !state.completed || !state.sessionId?'provider_runtime_failed':null);
         return {ok:!errorCode,sessionId:state.sessionId,model:options.model,identity,cliVersion:cli.version,usage:state.usage,providerError,errorCode,processTreeExited:verifiedExit,exitCode:result.code,...(budget?{budgetId:budget.budgetId,budget:budget.snapshot()}:{})};
       }finally{
         closed=true;clearTimeout(timer);options.signal?.removeEventListener('abort',abort);

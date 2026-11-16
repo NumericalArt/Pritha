@@ -209,7 +209,9 @@ test("card readiness exposes Outcome Spec and delivery as separate lifecycle sta
   });
   assert.equal(result.lifecycle.delivery.present, true);
   assert.equal(result.lifecycle.delivery.status, "awaiting_acceptance");
-  assert.match(result.nextActions.join("\n"), /Continue the delivery lifecycle from awaiting_acceptance/);
+  // A verified result is the operator's to start from its card, not more chat work (2026-11-16).
+  assert.match(result.nextActions.join("\n"), /operator starts the agent with Start on its card/);
+  assert.doesNotMatch(result.nextActions.join("\n"), /Continue the delivery lifecycle/);
 });
 
 test("card readiness rejects a real folder whose managed commands are still scaffold stubs", async () => {
@@ -395,6 +397,9 @@ test("the handoff card contract reads the live card and blocks what the operator
     const ready = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test", handoff: true });
     assert.equal(ready.status, "ready");
     assert.deepEqual(ready.cardContract.map((item) => `${item.id}:${item.status}`), ["identity:pass", "mission:pass", "version:pass", "verified:pass", "try:pass", "start:pass"]);
+    // A passing item says what was found, never the failure text (2026-11-16).
+    for (const item of ready.cardContract) assert.doesNotMatch(item.message, /\bno\b|does not|cannot|missing|unavailable/i, item.id);
+    assert.equal(ready.cardContract.find((item) => item.id === "start").message, "Start on the card can be executed.");
     card = { ...complete, mission: "Mission is not documented", versionStatus: "unavailable", version: "v?", operations: {}, resultReadiness: { verification: { status: "stale" } } };
     const gaps = await checkCardReadiness("alpha-agent", { root, baseUrl: "http://control.test", handoff: true });
     assert.equal(gaps.status, "blocked");

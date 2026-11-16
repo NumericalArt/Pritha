@@ -194,7 +194,8 @@ export async function instanceControlCenterUrl(options = {}) {
  * API process scaffold also need "Try this agent"; tool servers do not.
  */
 export function handoffCardContract(live, manifest) {
-  const item = (id, ok, message) => ({ id, status: ok ? "pass" : "fail", message });
+  // Each item says what was found: a passing item never carries the failure text (2026-11-16).
+  const item = (id, ok, failure, success) => ({ id, status: ok ? "pass" : "fail", message: ok ? success : failure });
   if (live.visible !== true) {
     return [item("card-visible", false, live.visible === false
       ? "The agent card is missing from the Control Center."
@@ -202,12 +203,13 @@ export function handoffCardContract(live, manifest) {
   }
   const card = live.card || {};
   return [
-    item("identity", card.identityStatus === "identified", "The card does not show a confirmed agent identity."),
-    item("mission", card.missionDocumented, "The card shows no documented mission."),
-    item("version", card.versionStatus === "ready", "The card shows no assigned version."),
-    item("verified", card.verification === "verified", "The card does not show a verified result."),
-    ...(manifest?.scaffold_adapter === "api-process-v1" ? [item("try", card.tryAvailable, "The card offers no \"Try this agent\" for this HTTP agent.")] : []),
-    item("start", live.action !== "start" || live.actionExecutionMode === "executable", "Start on the card cannot be executed."),
+    item("identity", card.identityStatus === "identified", "The card does not show a confirmed agent identity.", "The card shows a confirmed agent identity."),
+    item("mission", card.missionDocumented, "The card shows no documented mission.", "The card shows a documented mission."),
+    item("version", card.versionStatus === "ready", "The card shows no assigned version.", "The card shows an assigned version."),
+    item("verified", card.verification === "verified", "The card does not show a verified result.", "The card shows a verified result."),
+    ...(manifest?.scaffold_adapter === "api-process-v1" ? [item("try", card.tryAvailable, "The card offers no \"Try this agent\" for this HTTP agent.", "The card offers \"Try this agent\".")] : []),
+    item("start", live.action !== "start" || live.actionExecutionMode === "executable", "Start on the card cannot be executed.",
+      live.action === "start" ? "Start on the card can be executed." : "The card does not offer Start in its current state."),
   ];
 }
 
@@ -251,8 +253,11 @@ export async function checkCardReadiness(target, options = {}) {
     nextActions.push("Review and approve the Outcome Spec before autonomous delivery.");
   } else if (!lifecycle.delivery.present) {
     nextActions.push("Run outcome delivery to produce revision-bound verification evidence.");
-  } else if (["blocked", "awaiting_acceptance", "verified"].includes(lifecycle.delivery.status)) {
-    nextActions.push(`Continue the delivery lifecycle from ${lifecycle.delivery.status}.`);
+  } else if (lifecycle.delivery.status === "blocked") {
+    nextActions.push("Continue the delivery lifecycle from blocked.");
+  } else if (["awaiting_acceptance", "verified"].includes(lifecycle.delivery.status)) {
+    // A verified result is the operator's to start and try; nothing in a chat starts it (2026-11-16).
+    nextActions.push("Once the card has no blockers, the operator starts the agent with Start on its card, tries it there and decides about acceptance.");
   }
   const runtimeSelected = controlCenterRuntimeSelected(manifest);
   if (manifest) {

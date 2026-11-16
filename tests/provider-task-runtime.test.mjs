@@ -58,6 +58,18 @@ test('a provider model substitution gives an actionable error without changing t
   assert.equal(turn.error.code,'neuraldeep_model_identity_mismatch');assert.match(turn.error.message,/different model/);
   assert.match(turn.error.message,/new chat/);assert.equal(runtime.require(binding.chatId).modelId,'test-model');assert.equal(f.settings.modelId,'test-model');
 });
+test('a turn that used up its time says so and keeps the saved work instead of reporting a provider error',async t=>{
+  // Observed 2026-11-16: the creation chat's 30-minute limit was shown as "The provider task stopped with an error".
+  const f=fixture(t),runtime=f.make(),binding=(await runtime.create(create('time_limit_thread'))).binding;
+  const started=await runtime.start(binding.chatId,message('time_limit_message'));
+  await until(()=>f.runs.length===1);
+  f.runs[0].resolve({ok:false,errorCode:'provider_iteration_deadline',processTreeExited:true});
+  await until(()=>runtime.registry.turn(binding.chatId,started.accepted.turn.turnId).status==='failed');
+  const {error}=runtime.registry.turn(binding.chatId,started.accepted.turn.turnId);
+  assert.equal(error.code,'provider_iteration_deadline');
+  assert.match(error.message,/reached its time limit \(Task timeout in Settings\)/);assert.match(error.message,/Everything done so far is saved/);
+  assert.match(error.message,/Send a message in this chat to continue/);assert.doesNotMatch(error.message,/stopped with an error/);
+});
 test('a refused model identity names the public ID the provider answered with and drops anything else',async t=>{
   const f=fixture(t),runtime=f.make();
   const fail=async(id,modelDiagnostic)=>{

@@ -52,6 +52,19 @@ function contractIdentity(data,p,state,executor){
       || data.buildExecutor!==executor || data.buildGitMode!=='disposable-worktree' || data.autostart!=='disabled'
       || !Number.isSafeInteger(data.buildTokenBudget) || data.buildTokenBudget<1 || data.buildTokenBudget>10000000)throw factoryFail('factory_contract_identity_invalid');
 }
+/**
+ * What the model is told after a working handoff. The chat has no step that
+ * starts or calls the agent: Start and Try are operator actions on its card.
+ * Without saying so, a builder asked for a "running" agent searched the code
+ * for a start command and asked for commands until its turn ran out (2026-11-16).
+ */
+export function readyHandoffNext(firstUse){
+  return 'The agent is built, verified and handed over: its card works. Nothing in this chat starts, stops or calls the agent. '
+    +'The user starts it with Start on its card on the Agents page and tries it there'
+    +(firstUse?.liveModelVerified===false?'; liveModelVerified is false only because the checks used Pritha\'s protected local responder, and the first live model call happens when the user tries it':'')+'. '
+    +'This completes the creation, including a request to have the agent running. Do not look for a start command and do not request commands to start or call it. '
+    +'End this turn now with a short report: what was built, where its project is, what the checks verified, and that the user starts it from its card. Final acceptance is the user\'s separate decision.';
+}
 const validationFailure=issues=>Object.assign(factoryFail('factory_validation_failed'),{message:issues.map(row=>typeof row==='string'?row:row.code+' '+row.message).join('\n').slice(0,5000)});
 
 function deliveryVerification(result){
@@ -355,7 +368,8 @@ export async function executeVoiceFactoryStep(request,dependencies={}){
       // A verified revision that could not be applied yet (the agent is running, or the project changed) is not
       // the version in use: the card still serves the applied one, so the handoff is not complete.
       const unapplied=improving(state);
-      value={firstUse:verifiedFirstUse(p,state,result),deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,...(state.improvement?{improvement:{number:state.improvement.number,applied:!unapplied}}:{}),next:unapplied?'The revision is verified but not applied: '+(state.localApplication?.reason==='service_record_present'?'the agent is running its applied version. Ask the user to stop it from its card, then call finish again.':'resolve the reported application condition, then call finish again.')+' The applied version is unchanged.':card.status!=='ready'?'The agent is not handed over until its card works: '+(card.blockers||[]).slice(0,4).join(' ')+' Resolve these (or the local application condition), then call finish again.':accepted?'Result accepted. Publication retains its separate approval boundary.':'The checked local project is ready for first use. Services remain stopped; final user acceptance is separate.'};state.phase=card.status==='ready' && !unapplied?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
+      const firstUse=verifiedFirstUse(p,state,result);
+      value={firstUse,deliveryStatus:result.state.status,localApplication:state.localApplication,manualAcceptance:accepted?'accepted':'pending',card,...(state.improvement?{improvement:{number:state.improvement.number,applied:!unapplied}}:{}),next:unapplied?'The revision is verified but not applied: '+(state.localApplication?.reason==='service_record_present'?'the agent is running its applied version. Ask the user to stop it from its card, then call finish again.':'resolve the reported application condition, then call finish again.')+' The applied version is unchanged.':card.status!=='ready'?'The agent is not handed over until its card works: '+(card.blockers||[]).slice(0,4).join(' ')+' Resolve these (or the local application condition), then call finish again.':accepted?'Result accepted. Publication retains its separate approval boundary.':readyHandoffNext(firstUse)};state.phase=card.status==='ready' && !unapplied?(accepted?'accepted':'awaiting-manual-acceptance'):'card-blocked';break;
     }
     default:throw factoryFail('factory_input_invalid');
   }
